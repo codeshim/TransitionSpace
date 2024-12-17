@@ -44,13 +44,13 @@ def target_function(polygonList, variables):
     return -overlap_area  # Negative for minimization
 
 # Function to extract the ceiling polygon
-def extract_ceiling_polygon(group_clouds, excluded_categories):
+def extract_free_space_polygon(group_clouds, included_category, excluded_categories):
     ceiling_polygon = None
     excluded_polygons = []
 
     for category_name, points in group_clouds:
         points_2d = points[:, [0, 2]]  # Project to X-Z plane
-        if category_name == "ceiling":
+        if category_name == included_category:
             ceiling_polygon = Polygon(points_2d).convex_hull
         elif category_name in excluded_categories:
             excluded_polygons.append(Polygon(points_2d).convex_hull)
