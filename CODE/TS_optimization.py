@@ -9,6 +9,8 @@ from shapely.validation import make_valid
 from collections import defaultdict
 from heapq import heappop, heappush
 from S3DIS_to_json import jsonl_to_array
+import random
+from tqdm import tqdm
 
 def get_cloud_centroid(cloud):
     """
@@ -66,15 +68,15 @@ def clean_polygon(polygon):
             
     return polygon
 
-def extract_free_space_polygon(cloud, included_category, excluded_categories):
+def extract_free_space_polygon(cloud):
     free_space_polygon = None
     excluded_polygons = []
 
     for category_name, points in cloud:
         points_2d = points[:, [0, 2]]  # Project to X-Z plane
-        if category_name == included_category:
+        if category_name == g_included_category:
             free_space_polygon = Polygon(points_2d).convex_hull
-        elif category_name in excluded_categories:
+        elif category_name in g_excluded_categories:
             excluded_polygons.append(Polygon(points_2d).convex_hull)
 
     if not free_space_polygon:
@@ -85,32 +87,25 @@ def extract_free_space_polygon(cloud, included_category, excluded_categories):
         free_space_polygon = free_space_polygon.difference(union_excluded)
 
     # Polygon cleaning
-    free_space_polygon = clean_polygon(free_space_polygon)      
+    free_space_polygon = clean_polygon(free_space_polygon)
 
     return free_space_polygon
 
-def extract_voxels_hashmap(cloud, grid_size):
+def extract_voxels_hashmap(cloud):
     # Spatial hash map to store voxels occupied by points in each point cloud
     hash_map = defaultdict(list)
     category_name, points = cloud
 
     # Calculate cell coordinates for the point
     for point in points:
-        voxel_key = tuple((point // grid_size).astype(int)) # X, Y, Z, R, G, B
+        voxel_key = tuple((point // g_grid_size).astype(int)) # X, Y, Z, R, G, B
         hash_map[voxel_key].append(point) # include category_name(mapped into int) for contextual discontinuites
 
     return hash_map
 
-def maximize_shared_space(loc_polygon, rmt_polygon):
-
-    """
-    Calculate intersection areas between polygons in freespaces and boundaries,
-    excluding pairs with same index.
-    
-    Returns sum of all intersection
-    """ 
+def maximize_shared_space(rmt_polygon):
     try:
-        intersection = loc_polygon.intersection(rmt_polygon)
+        intersection = g_local_cloud.intersection(rmt_polygon)
         intersection = clean_polygon(intersection)
         intersection_area = intersection.area
     except Exception as e:
@@ -119,19 +114,8 @@ def maximize_shared_space(loc_polygon, rmt_polygon):
 
     return intersection_area
 
-def minimize_discontinuities(keys, loc_voxels, rmt_voxels):
-    """
-    Minimize discontinuities using A* algorithm, with cost as color differences between voxel pairs.
-    
-    Args:
-        keys (set): Overlapping voxel keys between local and remote voxels.
-        loc_voxels (dict): Hashmap of local voxels (key -> list of points).
-        rmt_voxels (dict): Hashmap of remote voxels (key -> list of points).
-    
-    Returns:
-        float: Total discontinuity cost for the optimal loop.
-        list: List of voxel keys forming the best loop.
-    """
+# Nested optimization
+def minimize_discontinuities(keys, rmt_trans, rmt_voxels):
     def compute_color_discontinuity(local_points, remote_points):
         """Calculate average color discontinuity (Euclidean distance)."""
         local_avg_color = np.mean(local_points[:, 3:], axis=0)
@@ -164,126 +148,353 @@ def minimize_discontinuities(keys, loc_voxels, rmt_voxels):
     f_cost[start_key] = 0
     heappush(open_list, (f_cost[start_key], start_key))
 
-    # A* Algorithm Loop
-    while open_list:
-        _, current_key = heappop(open_list)
+    # A* Algorithm Loop with tqdm
+    with tqdm(total=len(keys), desc="A* Progress", unit="nodes") as pbar:
+        while open_list:
+            _, current_key = heappop(open_list)
 
-        # If the loop is formed
-        if current_key in closed_list and len(closed_list) >= 10:
-            break
+            # If the loop is formed
+            if current_key in closed_list and len(closed_list) >= 10:
+                break
 
-        closed_list.add(current_key)
+            closed_list.add(current_key)
+            pbar.update(1)
 
-        for neighbor in get_neighbors(current_key):
-            if neighbor in closed_list:
-                continue
+            for neighbor in get_neighbors(current_key):
+                if neighbor in closed_list:
+                    continue
 
-            # Compute color discontinuity cost
-            local_points = np.array(loc_voxels.get(neighbor, []))
-            remote_points = np.array(rmt_voxels.get(neighbor, []))
+                # Compute color discontinuity cost
+                local_points = np.array(g_local_voxels.get(neighbor, []))
+                remote_points = np.array(rmt_voxels.get(neighbor, []))
 
-            if len(local_points) == 0 or len(remote_points) == 0:
-                continue  # Skip invalid neighbors
+                if len(local_points) == 0 or len(remote_points) == 0:
+                    continue  # Skip invalid neighbors
 
-            color_cost = compute_color_discontinuity(local_points, remote_points)
-            tentative_g_cost = g_cost[current_key] + color_cost
+                color_cost = compute_color_discontinuity(local_points, remote_points)
+                tentative_g_cost = g_cost[current_key] + color_cost
 
-            # Update costs if better path is found
-            if tentative_g_cost < g_cost[neighbor]:
-                parent_map[neighbor] = current_key
-                g_cost[neighbor] = tentative_g_cost
-                f_cost[neighbor] = tentative_g_cost  # No heuristic in this case
-                heappush(open_list, (f_cost[neighbor], neighbor))
+                # Update costs if better path is found
+                if tentative_g_cost < g_cost[neighbor]:
+                    parent_map[neighbor] = current_key
+                    g_cost[neighbor] = tentative_g_cost
+                    f_cost[neighbor] = tentative_g_cost  # No heuristic in this case
+                    heappush(open_list, (f_cost[neighbor], neighbor))
 
-    # Reconstruct the voxel loop path
-    best_voxel_loop = []
+    # Reconstruct the voxel loop path and save in global voxel loops
     node = current_key
-    while node in parent_map:
-        best_voxel_loop.append(node)
-        node = parent_map[node]
+    with tqdm(total=len(parent_map), desc="Reconstructing Path", unit="nodes") as pbar:
+        while node in parent_map:
+            g_voxel_loops[rmt_trans].append(node)
+            node = parent_map[node]
+            pbar.update(1)
 
     # Ensure the path forms a loop (back to start)
-    if len(best_voxel_loop) >= 10 and best_voxel_loop[-1] == start_key:
-        return g_cost[current_key], best_voxel_loop
+    if len(g_voxel_loops[rmt_trans]) >= 10 and g_voxel_loops[rmt_trans][-1] == start_key:
+        return g_cost[current_key]  # , best_voxel_loop
     else:
-        return float('inf'), []  # If no valid loop is found
+        return float('inf')  # , []  # If no valid loop is found
 
-def spea2_optimization(loc_cloud, rmt_cloud, rmt_centroid, in_category, ex_categories, g_size):
-    population = initialize_population(pop_size=20, variable_ranges={"theta": [-5, 5], "tx": [-0.3, 0.3], "tz": [-0.3, 0.3]})
-    archive = []
+    
 
-    for generation in range(max_generations):
-        for individual in population:
-            # Apply remote cloud transformation
-            remote_transform = (individual["theta"], individual["tx"], individual["tz"])
-            transformed_rmt_cloud = apply_points_transformation(rmt_cloud, rmt_centroid, remote_transform)
+def transitionspace_optimization(theta, tx, tz):
+    remote_transformation = (theta, tx, tz)
+    transformed_rmt_cloud = apply_points_transformation(g_remote_cloud, g_remote_centroid, remote_transformation)
             
-            # Extract free space polygons for obj1
-            local_polygon = extract_free_space_polygon(loc_cloud, in_category, ex_categories)
-            transformed_remote_polygon = extract_free_space_polygon(transformed_rmt_cloud, in_category, ex_categories)
+    # Compute shared space area using polygon with transformed remote space
+    transformed_remote_polygon = extract_free_space_polygon(transformed_rmt_cloud)
+    obj1 = -maximize_shared_space(transformed_remote_polygon)  # Negate for minimization
+    
+    # Extract voxels hashmap and overlapping hashmap keys for obj2
+    transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud)
+    overlapping_keys = set(g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
 
-            # Compute shared space area using polygon
-            obj1 = -maximize_shared_space(local_polygon, transformed_remote_polygon)  # Negate for minimization
-            
-            # Extract voxels hashmap and overlapping hashmap keys for obj2
-            local_voxels = extract_voxels_hashmap(loc_cloud, g_size)
-            transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud, g_size)
-            overlapping_keys = set(local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    # Compute discontinuities using voxelized hashmap
+    obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    
+    individual = [theta, tx, tz, obj1, obj2]
+    return individual
 
-            # Compute discontinuities using voxelized hashmap
-            obj2, voxel_loop = minimize_discontinuities(overlapping_keys, local_voxels, transformed_remote_voxels)
-            
-            # Store objectives and voxel loop
-            individual["obj1"] = obj1
-            individual["obj2"] = obj2
-            individual["voxel_loop"] = voxel_loop
+# ======================================= SPEA2 =======================================
+def dominance_function(solution_1, solution_2, number_of_functions = 2):
+    count     = 0
+    dominance = True
+    for k in range (1, number_of_functions + 1):
+        if (solution_1[-k] <= solution_2[-k]):
+            count = count + 1
+    if (count == number_of_functions):
+        dominance = True
+    else:
+        dominance = False       
+    return dominance
 
-        # Combine Population and Archive
-        combined_population = population + archive
-        
-        # # Fitness Assignment and Selection
-        # fitness_values = assign_spea2_fitness(combined_population)
-        # sorted_population = sort_by_fitness(fitness_values)
-        # archive = select_best_solutions(sorted_population, archive_size=10)
-        
-        # # Generate Offspring (Crossover and Mutation)
-        # offspring = generate_offspring(archive, crossover_rate=0.8, mutation_rate=0.2)
-        # population = offspring
+def euclidean_distance(coordinates):
+   a = coordinates
+   b = a.reshape(np.prod(a.shape[:-1]), 1, a.shape[-1])
+   return np.sqrt(np.einsum('ijk,ijk->ij',  b - a,  b - a)).squeeze()
 
-    return archive  # Pareto-optimal solutions with transformations and voxel loops
+def roulette_wheel(fitness_new): 
+    fitness = np.zeros((fitness_new.shape[0], 2))
+    for i in range(0, fitness.shape[0]):
+        fitness[i,0] = 1/(1+ fitness[i,0] + abs(fitness[:,0].min()))
+    fit_sum      = fitness[:,0].sum()
+    fitness[0,1] = fitness[0,0]
+    for i in range(1, fitness.shape[0]):
+        fitness[i,1] = (fitness[i,0] + fitness[i-1,1])
+    for i in range(0, fitness.shape[0]):
+        fitness[i,1] = fitness[i,1]/fit_sum
+    ix     = 0
+    random = int.from_bytes(os.urandom(8), byteorder = 'big') / ((1 << 64) - 1)
+    for i in range(0, fitness.shape[0]):
+        if (random <= fitness[i, 1]):
+          ix = i
+          break
+    return ix
+
+def raw_fitness_function(population, number_of_functions=2):
+    """Compute raw fitness values for the population."""
+    strength = np.zeros((population.shape[0], 1))
+    raw_fitness = np.zeros((population.shape[0], 1))
+    for i in range(0, population.shape[0]):
+        for j in range(0, population.shape[0]):
+            if i != j:
+                if dominance_function(population[i], population[j], number_of_functions):
+                    strength[i, 0] += 1
+    for i in range(0, population.shape[0]):
+        for j in range(0, population.shape[0]):
+            if i != j:
+                if dominance_function(population[i], population[j], number_of_functions):
+                    raw_fitness[j, 0] += strength[i, 0]
+    return raw_fitness
+
+def fitness_calculation(population, raw_fitness, number_of_functions=2):
+    """Calculate fitness using raw fitness and crowding distance."""
+    k = int(len(population) ** (1 / 2)) - 1
+    fitness = np.zeros((population.shape[0], 1))
+    distance = euclidean_distance(population[:, -number_of_functions:])
+    for i in range(0, fitness.shape[0]):
+        distance_ordered = np.sort(distance[i, :])
+        fitness[i, 0] = raw_fitness[i, 0] + 1 / (distance_ordered[k] + 2)
+    return fitness
+
+def sort_population_by_fitness(population, fitness):
+    """Sort population based on fitness values."""
+    idx = np.argsort(fitness[:, 0])
+    population = population[idx, :]
+    fitness = fitness[idx, :]
+    return population, fitness
+
+def breeding(population, fitness, mutation_rate, min_values, max_values):
+    """Create offspring population using crossover and mutation."""
+    offspring = np.copy(population)
+    for i in range(offspring.shape[0]):
+        parent_1, parent_2 = roulette_wheel(fitness), roulette_wheel(fitness)
+        while parent_1 == parent_2:
+            parent_2 = roulette_wheel(fitness)
+
+        # Crossover
+        theta = (population[parent_1, 0] + population[parent_2, 0]) / 2
+        tx = (population[parent_1, 1] + population[parent_2, 1]) / 2
+        tz = (population[parent_1, 2] + population[parent_2, 2]) / 2
+
+        # Mutation
+        if random.random() < mutation_rate:
+            theta += np.random.uniform(-1, 1)
+            tx += np.random.uniform(-0.1, 0.1)
+            tz += np.random.uniform(-0.1, 0.1)
+
+        # Clip to bounds
+        theta = np.clip(theta, min_values[0], max_values[0])
+        tx = np.clip(tx, min_values[1], max_values[1])
+        tz = np.clip(tz, min_values[2], max_values[2])
+
+        # Update offspring
+        offspring[i, :3] = [theta, tx, tz]
+        result = transitionspace_optimization(theta, tx, tz)
+        offspring[i, 3:] = result[3:]
+
+    return offspring
+
+def mutation(population, mutation_rate, min_values, max_values):
+    """Mutate the population."""
+    for i in range(population.shape[0]):
+        if random.random() < mutation_rate:
+            theta = population[i, 0] + np.random.uniform(-1, 1)
+            tx = population[i, 1] + np.random.uniform(-0.1, 0.1)
+            tz = population[i, 2] + np.random.uniform(-0.1, 0.1)
+
+            # Clip to bounds
+            theta = np.clip(theta, min_values[0], max_values[0])
+            tx = np.clip(tx, min_values[1], max_values[1])
+            tz = np.clip(tz, min_values[2], max_values[2])
+
+            # Update individual
+            population[i, :3] = [theta, tx, tz]
+            result = transitionspace_optimization(theta, tx, tz)
+            population[i, 3:] = result[3:]
+
+    return population
+
+def strength_pareto_evolutionary_algorithm_2(
+    population_size=10,
+    archive_size=10,
+    mutation_rate=0.1,
+    min_values=[-5, -0.3, -0.3],
+    max_values=[5, 0.3, 0.3],
+    generations=10,
+    verbose=True,
+):
+    """Run the SPEA2 optimization algorithm."""
+    # Initialize population
+    if verbose:
+        print("Initializing population...")
+    population = np.zeros((population_size, 5))
+    with tqdm(total=population_size, desc="Initializing population") as pbar:
+        for i in range(population_size):
+            theta = np.random.uniform(min_values[0], max_values[0])
+            tx = np.random.uniform(min_values[1], max_values[1])
+            tz = np.random.uniform(min_values[2], max_values[2])
+            individual = transitionspace_optimization(theta, tx, tz)
+            population[i, :] = individual
+            pbar.update(1)
+
+    archive = np.zeros((archive_size, 5))
+
+    # Main loop for generations
+    for generation in tqdm(range(generations), desc="Generations", leave=True):
+        if verbose:
+            print(f"Processing Generation {generation}...")
+
+        # Combine population and archive
+        combined_population = np.vstack([population, archive])
+
+        # Calculate raw fitness and fitness
+        if verbose:
+            print("Calculating fitness...")
+        with tqdm(total=len(combined_population), desc="Calculating fitness") as pbar:
+            raw_fitness = raw_fitness_function(combined_population)
+            fitness = fitness_calculation(combined_population, raw_fitness)
+            pbar.update(len(combined_population))
+
+        # Sort population by fitness
+        if verbose:
+            print("Sorting population by fitness...")
+        combined_population, fitness = sort_population_by_fitness(
+            combined_population, fitness
+        )
+
+        # Select top individuals for archive
+        archive = combined_population[:archive_size, :]
+
+        # Generate offspring
+        if verbose:
+            print("Breeding population...")
+        with tqdm(total=population_size, desc="Breeding population") as pbar:
+            population = breeding(
+                combined_population[:population_size, :],
+                fitness[:population_size, :],
+                mutation_rate,
+                min_values,
+                max_values,
+            )
+            pbar.update(population_size)
+
+        # Apply mutation
+        if verbose:
+            print("Applying mutation...")
+        with tqdm(total=population_size, desc="Mutating population") as pbar:
+            population = mutation(population, mutation_rate, min_values, max_values)
+            pbar.update(population_size)
+
+    return archive
+# ======================================= SPEA2 =======================================
+
+def visualize_pereto_set(pereto_set):
+    """
+    Visualize the best result (pereto_set[0]) with Open3D.
+    """
+    # Extract the transformation from pereto_set[0]
+    theta, tx, tz = pereto_set[:3]
+    transformation = (theta, tx, tz)
+
+    # Apply transformation to the remote cloud
+    transformed_remote_cloud = apply_points_transformation(g_remote_cloud, g_remote_centroid, transformation)
+
+    # Convert point clouds to Open3D format
+    local_cloud_points = g_local_cloud[:, 1]  # Assuming (category, points)
+    remote_cloud_points = transformed_remote_cloud[:, 1]
+
+    local_cloud_o3d = o3d.geometry.PointCloud()
+    local_cloud_o3d.points = o3d.utility.Vector3dVector(local_cloud_points)
+
+    remote_cloud_o3d = o3d.geometry.PointCloud()
+    remote_cloud_o3d.points = o3d.utility.Vector3dVector(remote_cloud_points)
+
+    # Color the clouds for differentiation
+    local_cloud_o3d.paint_uniform_color([1, 0, 0])  # Red for local
+    remote_cloud_o3d.paint_uniform_color([0, 0, 1])  # Blue for transformed remote
+
+    # Visualize voxel loop as line segments
+    voxel_keys = g_voxel_loops[transformation]
+    voxel_lines = []
+    line_set = o3d.geometry.LineSet()
+
+    for voxel in voxel_keys:
+        center = np.array(voxel) * g_grid_size  # Convert voxel keys to real-world positions
+        voxel_lines.append(center)
+
+    # Convert to Open3D lines
+    line_set.points = o3d.utility.Vector3dVector(voxel_lines)
+    line_set.lines = o3d.utility.Vector2iVector(
+        [[i, i + 1] for i in range(len(voxel_lines) - 1)]
+    )
+    line_set.paint_uniform_color([0, 1, 0])  # Green for voxel loops
+
+    # Visualize all components
+    o3d.visualization.draw_geometries([local_cloud_o3d, remote_cloud_o3d, line_set])
+
+# Global values
+g_local_cloud = []
+g_local_polygon = []
+g_local_voxels = []
+g_remote_cloud = []
+g_remote_centroid = []
+g_grid_size = 0.0
+g_included_category = ""
+g_excluded_categories = []
+g_voxel_loops = defaultdict(list)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--loc", type=str, required=True, help="Path to the local JSONL file.")
     parser.add_argument("--rmt", type=str, required=True, help="Path to the remote JSONL file.")
-    parser.add_argument("--included_category", type=str, nargs='+', default="ceiling")
-    parser.add_argument("--excluded_categories", type=str, nargs='+', default=[
-        "wall", "beam", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"])
     parser.add_argument("--grid_size", type=float, default=0.5)
+    parser.add_argument("--generation", type=int, default=50)
     
     args = parser.parse_args()
 
     # Load point clouds
-    local_cloud = jsonl_to_array(args.loc)
-    remote_cloud = jsonl_to_array(args.rmt)
+    g_local_cloud = jsonl_to_array(args.loc)  
+    g_remote_cloud = jsonl_to_array(args.rmt)
     
-    # Initialize
-    included_category = args.included_category
-    excluded_categories = args.excluded_categories
-    grid_size = args.grid_size
+    # Initialize global values
+    g_grid_size = args.grid_size
+    g_included_category = "ceiling"
+    g_excluded_categories = ["wall", "beam", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
+    g_local_polygon = extract_free_space_polygon(g_local_cloud)
+    g_local_voxels = extract_voxels_hashmap(g_local_cloud)
+    g_remote_centroid = get_cloud_centroid(g_remote_cloud)
 
-    # Get centroid of remote cloud
-    remote_centroid = get_cloud_centroid(remote_cloud)
-
-    # Run SPEA2 optimization
-    pareto_solutions = spea2_optimization(local_cloud, remote_cloud, remote_centroid, included_category, excluded_categories, grid_size)
-
-    # Select the best solution
-    best_solution = pareto_solutions[0]
-    optimized_transformation = (best_solution["theta"], best_solution["tx"], best_solution["tz"])
-    optimized_voxel_loop = best_solution["voxel_loop"]
-
-    # Apply transformation to visualize results
-    # transformed_remote = apply_transformation_to_voxels(remote_cloud, optimized_transformation)
-    # visualize_transformation(local_cloud, transformed_remote, optimized_voxel_loop)
+    # strength_pareto_evolutionary_algorithm_2 will be placed here***
+    pereto_set = strength_pareto_evolutionary_algorithm_2(
+                    population_size=5,
+                    archive_size=5,
+                    mutation_rate=0.1,
+                    min_values=[-5, -0.3, -0.3],
+                    max_values=[5, 0.3, 0.3],
+                    generations=5,
+                    verbose=True,)
+    
+    # visualize pereto_set[0]
+    visualize_pereto_set(pereto_set[0])

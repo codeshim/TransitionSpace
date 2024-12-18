@@ -1,7 +1,7 @@
 # Required Libraries
 import numpy  as np
 from shapely import affinity
-#from extractFunction import *
+from extractFunction import *
 
 ############################################################################
 
@@ -165,7 +165,7 @@ def simulated_annealing(min_values = [-100,-100], max_values = [100,100], min = 
                     tempPolygonToDraw = affinity.rotate(tempPolygonToDraw, theta_final[i], origin='centroid')
 
                 
-                #draw_to_imgs(polygonList, global_update, 'process')
+                draw_to_imgs(polygonList, global_update, 'process')
                 global_update = global_update + 1
 
 

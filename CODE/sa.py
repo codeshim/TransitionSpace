@@ -44,7 +44,7 @@ def target_function(polygonList, variables):
     return -overlap_area  # Negative for minimization
 
 # Function to extract the ceiling polygon
-def extract_free_space_polygon(group_clouds, included_category, excluded_categories):
+def extract_ceiling_polygon(group_clouds, included_category, excluded_categories):
     ceiling_polygon = None
     excluded_polygons = []
 
