@@ -13,6 +13,11 @@ from S3DIS_to_json import jsonl_to_array
 import random
 from tqdm import tqdm
 
+# ===================== GPU =====================
+import cupy as cp
+print("CUDA available:", cp.cuda.is_available())
+# ===================== GPU =====================
+
 def get_cloud_centroid(cloud):
     """
     Compute the centroid of the point cloud projected on the X-Z plane.
