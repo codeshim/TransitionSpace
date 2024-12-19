@@ -1,3 +1,4 @@
+import os
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,14 +17,15 @@ def get_cloud_centroid(cloud):
     """
     Compute the centroid of the point cloud projected on the X-Z plane.
     """
-    _, points = cloud  # Extract points
-    x_values = points[:, 0]  # X-axis values
-    z_values = points[:, 2]  # Z-axis values
+    all_points = np.vstack([points for _, points in cloud])
+    x_values = all_points[:, 0]  # X-axis values
+    z_values = all_points[:, 2]  # Z-axis values
     centroid_x = np.mean(x_values)
     centroid_z = np.mean(z_values)
+    
     return centroid_x, centroid_z
 
-def apply_points_transformation(points, centroid, transformation):
+def apply_points_transformation(cloud, centroid, transformation):
     theta, tx, tz = transformation
     centroid_x, centroid_z = centroid
 
@@ -31,29 +33,33 @@ def apply_points_transformation(points, centroid, transformation):
     theta_rad = np.radians(theta)
 
     # Step 1: Translate to origin (compute centroid of X and Z)
-    translated_points = np.copy(points)
-    translated_points[:, 0] -= centroid_x  # Subtract centroid_x
-    translated_points[:, 2] -= centroid_z  # Subtract centroid_z
+    transformed_cloud = []
+    for category_name, points in cloud:
+        translated_points = np.copy(points)
+        translated_points[:, 0] -= centroid_x  # Subtract centroid_x
+        translated_points[:, 2] -= centroid_z  # Subtract centroid_z
 
-    # Step 2: Rotate around origin in the X-Z plane
-    rotation_matrix = np.array([
-        [np.cos(theta_rad), -np.sin(theta_rad)],
-        [np.sin(theta_rad),  np.cos(theta_rad)]
-    ])
+        # Step 2: Rotate around origin in the X-Z plane
+        rotation_matrix = np.array([
+            [np.cos(theta_rad), -np.sin(theta_rad)],
+            [np.sin(theta_rad),  np.cos(theta_rad)]
+        ])
     
-    # Apply rotation to the X-Z components
-    rotated_xz = np.dot(translated_points[:, [0, 2]], rotation_matrix.T)
+        # Apply rotation to the X-Z components
+        rotated_xz = np.dot(translated_points[:, [0, 2]], rotation_matrix.T)
     
-    # Update points with rotated X-Z values
-    rotated_points = np.copy(translated_points)
-    rotated_points[:, 0] = rotated_xz[:, 0]  # Update X
-    rotated_points[:, 2] = rotated_xz[:, 1]  # Update Z
+        # Update points with rotated X-Z values
+        rotated_points = np.copy(translated_points)
+        rotated_points[:, 0] = rotated_xz[:, 0]  # Update X
+        rotated_points[:, 2] = rotated_xz[:, 1]  # Update Z
 
-    # Step 3: Translate back with offset (tx, tz)
-    rotated_points[:, 0] += centroid_x + tx  # Add back centroid and offset tx
-    rotated_points[:, 2] += centroid_z + tz  # Add back centroid and offset tz
+        # Step 3: Translate back with offset (tx, tz)
+        rotated_points[:, 0] += centroid_x + tx  # Add back centroid and offset tx
+        rotated_points[:, 2] += centroid_z + tz  # Add back centroid and offset tz
 
-    return rotated_points
+        transformed_cloud.append((category_name, rotated_points))
+
+    return transformed_cloud
 
 def clean_polygon(polygon):
     """
@@ -94,18 +100,18 @@ def extract_free_space_polygon(cloud):
 def extract_voxels_hashmap(cloud):
     # Spatial hash map to store voxels occupied by points in each point cloud
     hash_map = defaultdict(list)
-    category_name, points = cloud
-
-    # Calculate cell coordinates for the point
-    for point in points:
-        voxel_key = tuple((point // g_grid_size).astype(int)) # X, Y, Z, R, G, B
-        hash_map[voxel_key].append(point) # include category_name(mapped into int) for contextual discontinuites
-
+    for category_name, points in cloud:
+        # include category_name(mapped into int) for contextual discontinuites
+        # Calculate cell coordinates for the point
+        for point in points:
+            voxel_key = tuple((point // g_grid_size).astype(int))  # X, Y, Z, R, G, B
+            hash_map[voxel_key].append(point)
+    
     return hash_map
 
 def maximize_shared_space(rmt_polygon):
     try:
-        intersection = g_local_cloud.intersection(rmt_polygon)
+        intersection = g_local_polygon.intersection(rmt_polygon)
         intersection = clean_polygon(intersection)
         intersection_area = intersection.area
     except Exception as e:
@@ -421,18 +427,23 @@ def visualize_pereto_set(pereto_set):
     transformed_remote_cloud = apply_points_transformation(g_remote_cloud, g_remote_centroid, transformation)
 
     # Convert point clouds to Open3D format
-    local_cloud_points = g_local_cloud[:, 1]  # Assuming (category, points)
-    remote_cloud_points = transformed_remote_cloud[:, 1]
+    local_all_cloud_points = np.vstack([points for _, points in g_local_cloud])
+    remote_all_cloud_points = np.vstack([points for _, points in transformed_remote_cloud])
+
+    print(f"local_all_cloud_points:{local_all_cloud_points[0]}")
+    print(f"remote_all_cloud_points:{remote_all_cloud_points[0]}")
 
     local_cloud_o3d = o3d.geometry.PointCloud()
-    local_cloud_o3d.points = o3d.utility.Vector3dVector(local_cloud_points)
+    local_cloud_o3d.points = o3d.utility.Vector3dVector(local_all_cloud_points[:, :3])
 
     remote_cloud_o3d = o3d.geometry.PointCloud()
-    remote_cloud_o3d.points = o3d.utility.Vector3dVector(remote_cloud_points)
+    remote_cloud_o3d.points = o3d.utility.Vector3dVector(remote_all_cloud_points[:, :3])
 
     # Color the clouds for differentiation
-    local_cloud_o3d.paint_uniform_color([1, 0, 0])  # Red for local
-    remote_cloud_o3d.paint_uniform_color([0, 0, 1])  # Blue for transformed remote
+    # local_cloud_o3d.paint_uniform_color([1, 0, 0])  # Red for local
+    # remote_cloud_o3d.paint_uniform_color([0, 0, 1])  # Blue for transformed remote
+    local_cloud_o3d.colors = o3d.utility.Vector3dVector(local_all_cloud_points[:, 3:6] / 255.0)
+    remote_cloud_o3d.colors = o3d.utility.Vector3dVector(remote_all_cloud_points[:, 3:6] / 255.0)
 
     # Visualize voxel loop as line segments
     voxel_keys = g_voxel_loops[transformation]
@@ -463,6 +474,7 @@ g_grid_size = 0.0
 g_included_category = ""
 g_excluded_categories = []
 g_voxel_loops = defaultdict(list)
+g_shared_polygon = defaultdict(list)
 
 
 if __name__ == "__main__":
@@ -477,6 +489,17 @@ if __name__ == "__main__":
     # Load point clouds
     g_local_cloud = jsonl_to_array(args.loc)  
     g_remote_cloud = jsonl_to_array(args.rmt)
+
+    """
+    ValueError: too many values to unpack (expected 2)
+    g_local_cloud = 
+    [
+    ("wall", array([[1.0, 2.0, 3.0, R, G, B], [4.0, 5.0, 6.0], ...])),
+    ("ceiling", array([[0.5, 1.5, 2.5], [3.5, 4.5, 5.5], ...])),
+    ...
+    ]
+    expected value = ["wall", array([[1.0, 2.0, 3.0, R, G, B], [4.0, 5.0, 6.0], ...])]
+    """
     
     # Initialize global values
     g_grid_size = args.grid_size
@@ -491,10 +514,12 @@ if __name__ == "__main__":
                     population_size=5,
                     archive_size=5,
                     mutation_rate=0.1,
-                    min_values=[-5, -0.3, -0.3],
-                    max_values=[5, 0.3, 0.3],
+                    min_values=[-180.0, -3.0, -3.0],
+                    max_values=[180.0, 3.0, 3.0],
                     generations=5,
                     verbose=True,)
     
     # visualize pereto_set[0]
     visualize_pereto_set(pereto_set[0])
+    # temp = [60.0, 2.5, 1.0]
+    # visualize_pereto_set(temp)
