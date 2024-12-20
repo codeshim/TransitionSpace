@@ -213,11 +213,12 @@ def transitionspace_optimization(theta, tx, tz):
     obj1 = -maximize_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
     
     # Extract voxels hashmap and overlapping hashmap keys for obj2
-    transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud)
-    overlapping_keys = set(g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    # transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud)
+    # overlapping_keys = set(g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
 
     # Compute discontinuities using voxelized hashmap
-    obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    # obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    obj2 = 0
     
     individual = [theta, tx, tz, obj1, obj2]
     return individual
@@ -556,19 +557,19 @@ if __name__ == "__main__":
     # Initialize global values
     g_grid_size = args.grid_size
     g_included_category = "ceiling"
-    g_excluded_categories = ["wall", "beam", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
+    g_excluded_categories = ["wall", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
     g_local_polygon = extract_free_space_polygon(g_local_cloud)
     g_local_voxels = extract_voxels_hashmap(g_local_cloud)
     g_remote_centroid = get_cloud_centroid(g_remote_cloud)
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
     pareto_front = strength_pareto_evolutionary_algorithm_2(
-                    population_size=5,
-                    archive_size=5,
+                    population_size=20,
+                    archive_size=20,
                     mutation_rate=0.1,
-                    min_values=[-180.0, -3.0, -3.0],
-                    max_values=[180.0, 3.0, 3.0],
-                    generations=5,
+                    min_values=[-180.0, -5.0, -5.0],
+                    max_values=[180.0, 5.0, 5.0],
+                    generations=50,
                     verbose=True,)
     
     # visualize pareto_front[0]

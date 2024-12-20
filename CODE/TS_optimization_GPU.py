@@ -12,6 +12,7 @@ from heapq import heappop, heappush
 from S3DIS_to_json import jsonl_to_array
 import random
 from tqdm import tqdm
+import time
 
 # ===================== GPU =====================
 import cupy as cp
@@ -29,6 +30,14 @@ def get_cloud_centroid(cloud):
     centroid_z = np.mean(z_values)
     
     return centroid_x, centroid_z
+
+    # all_points = cp.vstack([cp.asarray(points) for _, points in cloud])
+    
+    # # Extract X and Z values and compute mean
+    # centroid_x = cp.mean(all_points[:, 0]).item()  # Convert back to Python float
+    # centroid_z = cp.mean(all_points[:, 2]).item()
+    
+    # return centroid_x, centroid_z
 
 def apply_points_transformation(cloud, centroid, transformation):
     theta, tx, tz = transformation
@@ -65,6 +74,43 @@ def apply_points_transformation(cloud, centroid, transformation):
         transformed_cloud.append((category_name, rotated_points))
 
     return transformed_cloud
+
+    # theta, tx, tz = transformation
+    # centroid_x, centroid_z = centroid
+
+    # # Convert theta to radians for computation
+    # theta_rad = cp.radians(theta)
+
+    # # Create rotation matrix on GPU
+    # rotation_matrix = cp.array([
+    #     [cp.cos(theta_rad), -cp.sin(theta_rad)],
+    #     [cp.sin(theta_rad),  cp.cos(theta_rad)]
+    # ])
+
+    # transformed_cloud = []
+    # for category_name, points in cloud:
+    #     # Move points to GPU
+    #     points_gpu = cp.asarray(points)
+
+    #     # Step 1: Translate to origin (X-Z plane)
+    #     points_gpu[:, 0] -= centroid_x
+    #     points_gpu[:, 2] -= centroid_z
+
+    #     # Step 2: Rotate around the origin in the X-Z plane
+    #     rotated_xz = cp.dot(points_gpu[:, [0, 2]], rotation_matrix.T)
+
+    #     # Update X and Z components with rotated values
+    #     points_gpu[:, 0] = rotated_xz[:, 0]
+    #     points_gpu[:, 2] = rotated_xz[:, 1]
+
+    #     # Step 3: Translate back with offset (tx, tz)
+    #     points_gpu[:, 0] += centroid_x + tx
+    #     points_gpu[:, 2] += centroid_z + tz
+
+    #     # Convert back to NumPy for compatibility
+    #     transformed_cloud.append((category_name, cp.asnumpy(points_gpu)))
+
+    # return transformed_cloud
 
 def clean_polygon(polygon):
     """
@@ -207,7 +253,6 @@ def minimize_discontinuities(keys, rmt_trans, rmt_voxels):
     else:
         return float('inf')  # , []  # If no valid loop is found
 
-    
 
 def transitionspace_optimization(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
@@ -218,11 +263,12 @@ def transitionspace_optimization(theta, tx, tz):
     obj1 = -maximize_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
     
     # Extract voxels hashmap and overlapping hashmap keys for obj2
-    transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud)
-    overlapping_keys = set(g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    # transformed_remote_voxels = extract_voxels_hashmap(transformed_rmt_cloud)
+    # overlapping_keys = set(g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
 
     # Compute discontinuities using voxelized hashmap
-    obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    # obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    obj2 = 0
     
     individual = [theta, tx, tz, obj1, obj2]
     return individual
@@ -518,7 +564,9 @@ def visualize_pareto_front(pereto_set):
         [local_cloud_o3d, remote_cloud_o3d, line_set] + shared_meshes
     )
 
-
+def measure_execution_time(start_time):
+    end_time = time.time()
+    print(f"Total time taken: {end_time - start_time:.2f} seconds")
 
 
 # Global values
@@ -557,24 +605,28 @@ if __name__ == "__main__":
     ]
     expected value = ["wall", array([[1.0, 2.0, 3.0, R, G, B], [4.0, 5.0, 6.0], ...])]
     """
-    
+
+    start_time = time.time()
+
     # Initialize global values
     g_grid_size = args.grid_size
     g_included_category = "ceiling"
-    g_excluded_categories = ["wall", "beam", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
+    g_excluded_categories = ["wall", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
     g_local_polygon = extract_free_space_polygon(g_local_cloud)
-    g_local_voxels = extract_voxels_hashmap(g_local_cloud)
+    #g_local_voxels = extract_voxels_hashmap(g_local_cloud)
     g_remote_centroid = get_cloud_centroid(g_remote_cloud)
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
     pareto_front = strength_pareto_evolutionary_algorithm_2(
-                    population_size=5,
-                    archive_size=5,
+                    population_size=20,
+                    archive_size=20,
                     mutation_rate=0.1,
-                    min_values=[-180.0, -3.0, -3.0],
-                    max_values=[180.0, 3.0, 3.0],
-                    generations=5,
+                    min_values=[-180.0, -5.0, -5.0],
+                    max_values=[180.0, 5.0, 5.0],
+                    generations=10,
                     verbose=True,)
+    
+    measure_execution_time(start_time)
     
     # visualize pareto_front[0]
     visualize_pareto_front(pareto_front[0])
