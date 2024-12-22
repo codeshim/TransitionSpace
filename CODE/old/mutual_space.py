@@ -5,7 +5,7 @@ from tqdm import tqdm
 import json
 import matplotlib.pyplot as plt
 from shapely.geometry import MultiPoint
-from S3DIS_to_json import jsonl_to_array, visualize
+from CODE.components.S3DIS_to_json import jsonl_to_array, visualize
 
 CATEGORY_MAPPING = {
     "ceiling": 1,

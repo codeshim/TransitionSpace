@@ -4,7 +4,7 @@ import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import unary_union
 from shapely import affinity
-from S3DIS_to_json import jsonl_to_array
+from CODE.components.S3DIS_to_json import jsonl_to_array
 from optimization.sa_threeplus import simulated_annealing
 import open3d as o3d
 
