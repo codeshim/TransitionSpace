@@ -1,11 +1,45 @@
 from collections import defaultdict
 
+# Define category code colors
+CATEGORY_MAPPING = {
+    "ceiling": 1,
+    "floor": 2,
+    "wall": 3,
+    "beam": 4,
+    "column": 5,
+    "window": 6,
+    "door": 7,
+    "table": 8,
+    "chair": 9,
+    "sofa": 10,
+    "bookcase": 11,
+    "board": 12,
+    "clutter": 0
+}
+
+CATEGORY_COLORS = {
+    0: [92, 164, 169],
+    1: [219, 84, 97],
+    2: [255, 217, 206],
+    3: [89, 60, 143],
+    4: [142, 249, 243],
+    5: [23, 23, 56],
+    6: [37, 110, 255],
+    7: [70, 35, 122],
+    8: [61, 220, 151],
+    9: [255, 73, 92],
+    10: [237, 106, 90],
+    11: [244, 241, 187],
+    12: [255, 0, 0]
+}
+
 # Default global values for point cloud and optimization operations
 g_local_cloud = []
 g_local_polygon = None
 g_local_voxels = None
 g_remote_cloud = []
 g_remote_centroid = None
+g_down_size = 0.05
 g_grid_size = 0.5  # Default grid size for voxelization
 g_included_category = "ceiling"
 g_excluded_categories = [

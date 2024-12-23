@@ -1,5 +1,5 @@
 import argparse
-from components.S3DIS_to_json import jsonl_to_array
+from components.S3DIS_to_json import jsonl_to_group_clouds
 import components.geometry_utils as utils
 import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
@@ -11,12 +11,18 @@ if __name__ == "__main__":
     parser.add_argument("--rmt", type=str, required=True, help="Path to the remote room JSONL file.")
     parser.add_argument("--grid_size", type=float, default=0.5)
     parser.add_argument("--generation", type=int, default=50)
+    parser.add_argument("--down_size", type=float, default=0.05)
     
     args = parser.parse_args()
 
     # Load point clouds
-    const.g_local_cloud = jsonl_to_array(args.loc)  
-    const.g_remote_cloud = jsonl_to_array(args.rmt)
+    const.g_local_cloud = jsonl_to_group_clouds(args.loc)  
+    const.g_remote_cloud = jsonl_to_group_clouds(args.rmt)
+
+    # Downsample point clouds
+    const.g_down_size = args.down_size
+    const.g_local_cloud = utils.downsample_points(const.g_local_cloud)
+    const.g_remote_cloud = utils.downsample_points(const.g_remote_cloud)
 
     # Initialize global values(constants)
     const.g_grid_size = args.grid_size

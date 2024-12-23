@@ -5,39 +5,8 @@ import json
 import argparse
 from tqdm import tqdm
 from collections import defaultdict
+import components.constants as const
 
-# Define category code colors
-CATEGORY_MAPPING = {
-    "ceiling": 1,
-    "floor": 2,
-    "wall": 3,
-    "beam": 4,
-    "column": 5,
-    "window": 6,
-    "door": 7,
-    "table": 8,
-    "chair": 9,
-    "sofa": 10,
-    "bookcase": 11,
-    "board": 12,
-    "clutter": 0
-}
-
-CATEGORY_COLORS = {
-    0: [92, 164, 169],
-    1: [219, 84, 97],
-    2: [255, 217, 206],
-    3: [89, 60, 143],
-    4: [142, 249, 243],
-    5: [23, 23, 56],
-    6: [37, 110, 255],
-    7: [70, 35, 122],
-    8: [61, 220, 151],
-    9: [255, 73, 92],
-    10: [237, 106, 90],
-    11: [244, 241, 187],
-    12: [255, 0, 0]
-}
 
 S3DIS_DIR = "DATA/S3DIS/"
 JSONL_DIR = "DATA/jsonl/"
@@ -60,7 +29,7 @@ def load_point_cloud_data(directory):
         folder_name = os.path.basename(os.path.dirname(group_dir))
         for file in tqdm(files, desc=f"Loading files in {group_dir}"):
             category_name = os.path.basename(file).split("_")[0]
-            category_id = CATEGORY_MAPPING.get(category_name, -1)
+            category_id = const.CATEGORY_MAPPING.get(category_name, -1)
             if category_id == -1:
                 print(f"Unknown category: {category_name} in file {file}")
                 continue
@@ -144,7 +113,7 @@ def write_as_jsonl(directory):
 
     print(f"{output_file} saved.")
 
-def jsonl_to_array(directory):
+def jsonl_to_group_clouds(directory):
     directory = JSONL_DIR + directory
     with open(directory, 'r') as f:
         # Read the first line (metadata)
@@ -178,7 +147,7 @@ def set_point_colors(points, mode="rgb"):
     elif mode == "category":
         # Use the last column as category index
         categories = points[:, 6].astype(int)
-        colors = np.array([CATEGORY_COLORS.get(cat, [0, 0, 0]) 
+        colors = np.array([const.CATEGORY_COLORS.get(cat, [0, 0, 0]) 
                            for cat in tqdm(categories, desc=f"Setting up points color")]) / 255.0
         return colors
 
@@ -196,7 +165,7 @@ def visualize(group_clouds):
         
         # Combine all points with category IDs
         all_points = np.vstack([
-                     np.hstack([points, np.full((points.shape[0], 1), CATEGORY_MAPPING[category_name])])
+                     np.hstack([points, np.full((points.shape[0], 1), const.CATEGORY_MAPPING[category_name])])
                      for category_name, points in group_clouds])
         
         # Set points and colors
@@ -251,7 +220,7 @@ if __name__ == "__main__":
         if not args.jsonl:
             print("Error: --jsonl is required in read mode (-r).")
         else:
-            group_clouds = jsonl_to_array(args.jsonl)
+            group_clouds = jsonl_to_group_clouds(args.jsonl)
             visualize(group_clouds)
     else:
         print("Error: Either -w or -r must be specified.")
