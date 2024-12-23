@@ -48,17 +48,17 @@ def downsample_points(group_clouds, voxel_size=0.05):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points[:, :3])
         pcd.colors = o3d.utility.Vector3dVector(points[:, 3:6] / 255.0)
-        original_count = len(pcd.points)
         down_pcd = pcd.voxel_down_sample(voxel_size)
-        downsampled_count = len(down_pcd.points)
 
-        # Print detailed information
-        reduced_count = original_count - downsampled_count
-        reduction_percentage = (reduced_count / original_count) * 100 if original_count > 0 else 0
-        print(f"Category: {category_name}")
-        print(f"  Original points: {original_count}")
-        print(f"  Downsampled points: {downsampled_count}")
-        print(f"  Points reduced: {reduced_count} ({reduction_percentage:.2f}%)")
+        # # Print detailed information
+        # original_count = len(pcd.points)
+        # downsampled_count = len(down_pcd.points)
+        # reduced_count = original_count - downsampled_count
+        # reduction_percentage = (reduced_count / original_count) * 100 if original_count > 0 else 0
+        # print(f"Category: {category_name}")
+        # print(f"  Original points: {original_count}")
+        # print(f"  Downsampled points: {downsampled_count}")
+        # print(f"  Points reduced: {reduced_count} ({reduction_percentage:.2f}%)")
         
         # Append back to the result dictionary
         down_points = np.asarray(down_pcd.points)
@@ -161,9 +161,9 @@ def extract_voxels_hashmap(group_clouds):
     Create a spatial hash map of voxels occupied by the point cloud.
     """
     hash_map = defaultdict(list)
-    for category_name, points in group_clouds:
+    for _, points in group_clouds:
         for point in points:
-            voxel_key = tuple((point // const.g_grid_size).astype(int))
+            voxel_key = tuple((point[:3] // const.g_grid_size).astype(int))
             hash_map[voxel_key].append(point)
 
     return hash_map

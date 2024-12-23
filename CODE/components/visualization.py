@@ -4,6 +4,42 @@ import matplotlib.pyplot as plt
 import components.geometry_utils as utils
 import components.constants as const
 
+# Function to calculate voxel center from cell key
+def voxel_centers(cell_key):
+    # Calculate the center of the voxel based on its grid position
+    return np.array(cell_key) * const.g_grid_size + (const.g_grid_size / 2.0)
+
+def create_voxel_wireframe(center):
+    # Define the 8 corners of the voxel
+    half_size = const.g_grid_size / 2.0
+    corners = [
+        center + np.array([half_size, half_size, half_size]),
+        center + np.array([half_size, half_size, -half_size]),
+        center + np.array([half_size, -half_size, half_size]),
+        center + np.array([half_size, -half_size, -half_size]),
+        center + np.array([-half_size, half_size, half_size]),
+        center + np.array([-half_size, half_size, -half_size]),
+        center + np.array([-half_size, -half_size, half_size]),
+        center + np.array([-half_size, -half_size, -half_size])
+    ]
+
+    # Define the 12 edges connecting the corners
+    lines = [
+        [0, 1], [0, 2], [0, 4],
+        [1, 3], [1, 5],
+        [2, 3], [2, 6],
+        [3, 7],
+        [4, 5], [4, 6],
+        [5, 7],
+        [6, 7]
+    ]
+
+    # Create a LineSet object from the corners and lines
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(corners)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    return line_set
+
 def visualize_pareto_front(pereto_set):
     """
     Visualize the best result (pereto_set[0]) with Open3D and matplotlib.
@@ -33,20 +69,27 @@ def visualize_pareto_front(pereto_set):
     remote_cloud_o3d.colors = o3d.utility.Vector3dVector(remote_all_cloud_points[:, 3:6] / 255.0)
 
     # Visualize voxel loop as line segments
-    voxel_keys = const.g_voxel_loops[transformation]
-    voxel_lines = []
-    line_set = o3d.geometry.LineSet()
+    # voxel_keys = const.g_voxel_loops[transformation]
+    line_sets = []
+    transformed_remote_voxels = utils.extract_voxels_hashmap(transformed_remote_cloud)
+    voxel_keys = set(const.g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    for key in voxel_keys:
+        voxel_center = voxel_centers(key)
+        line_set = create_voxel_wireframe(voxel_center)
+        line_set.paint_uniform_color([1.0, 0.0, 0.0])
+        line_sets.append(line_set)
 
-    for voxel in voxel_keys:
-        center = np.array(voxel) * const.g_grid_size  # Convert voxel keys to real-world positions
-        voxel_lines.append(center)
+    print(f"voxel_keys num: {len(voxel_keys)}, tr: {pereto_set[0]}, {pereto_set[1]}, {pereto_set[2]}, obj1: {pereto_set[3]}, obj2: {pereto_set[4]}")
+
+    # for voxel in voxel_keys:
+    #     center = np.array(voxel) * const.g_grid_size  # Convert voxel keys to real-world positions
+    #     voxel_lines.append(center)
 
     # Convert to Open3D lines
-    line_set.points = o3d.utility.Vector3dVector(voxel_lines)
-    line_set.lines = o3d.utility.Vector2iVector(
-        [[i, i + 1] for i in range(len(voxel_lines) - 1)]
-    )
-    line_set.paint_uniform_color([0, 1, 0])  # Green for voxel loops
+    # line_set.points = o3d.utility.Vector3dVector(voxel_lines)
+    # line_set.lines = o3d.utility.Vector2iVector(
+    #     [[i, i + 1] for i in range(len(voxel_lines) - 1)]
+    # )
 
     # Visualize shared polygon
     shared_polygons = const.g_shared_polygon[transformation]
@@ -98,5 +141,5 @@ def visualize_pareto_front(pereto_set):
 
     # Visualize all components with Open3D (3D visualization)
     o3d.visualization.draw_geometries(
-        [local_cloud_o3d, remote_cloud_o3d, line_set] + shared_meshes
+        [local_cloud_o3d, remote_cloud_o3d] + line_sets + shared_meshes
     )
