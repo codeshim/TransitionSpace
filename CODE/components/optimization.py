@@ -112,32 +112,41 @@ def breeding(population, fitness, mutation_rate, min_values, max_values):
     """
     offspring = np.copy(population)
     for i in range(offspring.shape[0]):
-        parent_1, parent_2 = roulette_wheel(fitness), roulette_wheel(fitness)
-        while parent_1 == parent_2:
-            parent_2 = roulette_wheel(fitness)
+        while True:  # Retry until a valid offspring is generated
+            parent_1, parent_2 = roulette_wheel(fitness), roulette_wheel(fitness)
+            while parent_1 == parent_2:
+                parent_2 = roulette_wheel(fitness)
 
-        # Crossover
-        theta = (population[parent_1, 0] + population[parent_2, 0]) / 2
-        tx = (population[parent_1, 1] + population[parent_2, 1]) / 2
-        tz = (population[parent_1, 2] + population[parent_2, 2]) / 2
+            # Crossover
+            theta = (population[parent_1, 0] + population[parent_2, 0]) / 2
+            tx = (population[parent_1, 1] + population[parent_2, 1]) / 2
+            tz = (population[parent_1, 2] + population[parent_2, 2]) / 2
 
-        # Mutation
-        if random.random() < mutation_rate:
-            theta += np.random.uniform(-1, 1)
-            tx += np.random.uniform(-0.1, 0.1)
-            tz += np.random.uniform(-0.1, 0.1)
+            # Mutation
+            if random.random() < mutation_rate:
+                theta += np.random.uniform(-1, 1)
+                tx += np.random.uniform(-0.1, 0.1)
+                tz += np.random.uniform(-0.1, 0.1)
 
-        # Clip to bounds
-        theta = np.clip(theta, min_values[0], max_values[0])
-        tx = np.clip(tx, min_values[1], max_values[1])
-        tz = np.clip(tz, min_values[2], max_values[2])
+            # Clip to bounds
+            theta = np.clip(theta, min_values[0], max_values[0])
+            tx = np.clip(tx, min_values[1], max_values[1])
+            tz = np.clip(tz, min_values[2], max_values[2])
 
-        # Update offspring
-        offspring[i, :3] = [theta, tx, tz]
-        result = f.individual_transitionspace(theta, tx, tz)
-        offspring[i, 3:] = result[3:]
+            # Generate offspring
+            result = f.individual_transitionspace(theta, tx, tz)
+
+            if result is not None:  # Check for valid offspring
+                # Update offspring and exit the retry loop
+                offspring[i, :3] = [theta, tx, tz]
+                offspring[i, 3:] = result[3:]
+                break
+            else:
+                # Optionally log or print a message for debugging
+                print(f"Invalid offspring: theta={theta}, tx={tx}, tz={tz}. Retrying...")
 
     return offspring
+
 
 
 def mutation(population, mutation_rate, min_values, max_values):
@@ -146,21 +155,31 @@ def mutation(population, mutation_rate, min_values, max_values):
     """
     for i in range(population.shape[0]):
         if random.random() < mutation_rate:
-            theta = population[i, 0] + np.random.uniform(-1, 1)
-            tx = population[i, 1] + np.random.uniform(-0.1, 0.1)
-            tz = population[i, 2] + np.random.uniform(-0.1, 0.1)
+            while True:  # Retry mutation until a valid result is generated
+                # Apply mutation to parameters
+                theta = population[i, 0] + np.random.uniform(-1, 1)
+                tx = population[i, 1] + np.random.uniform(-0.1, 0.1)
+                tz = population[i, 2] + np.random.uniform(-0.1, 0.1)
 
-            # Clip to bounds
-            theta = np.clip(theta, min_values[0], max_values[0])
-            tx = np.clip(tx, min_values[1], max_values[1])
-            tz = np.clip(tz, min_values[2], max_values[2])
+                # Clip to bounds
+                theta = np.clip(theta, min_values[0], max_values[0])
+                tx = np.clip(tx, min_values[1], max_values[1])
+                tz = np.clip(tz, min_values[2], max_values[2])
 
-            # Update individual
-            population[i, :3] = [theta, tx, tz]
-            result = f.individual_transitionspace(theta, tx, tz)
-            population[i, 3:] = result[3:]
+                # Generate individual with mutated parameters
+                result = f.individual_transitionspace(theta, tx, tz)
+
+                if result is not None:  # Check if the result is valid
+                    # Update the individual's parameters in the population
+                    population[i, :3] = [theta, tx, tz]
+                    population[i, 3:] = result[3:]
+                    break  # Exit the retry loop once a valid individual is found
+                else:
+                    # Optionally log or print for debugging
+                    print(f"Invalid mutation: theta={theta}, tx={tx}, tz={tz}. Retrying...")
 
     return population
+
 
 
 def strength_pareto_evolutionary_algorithm_2(
@@ -181,12 +200,19 @@ def strength_pareto_evolutionary_algorithm_2(
     population = np.zeros((population_size, 5))
     with tqdm(total=population_size, desc="Initializing population") as pbar:
         for i in range(population_size):
-            theta = np.random.uniform(min_values[0], max_values[0])
-            tx = np.random.uniform(min_values[1], max_values[1])
-            tz = np.random.uniform(min_values[2], max_values[2])
-            individual = f.individual_transitionspace(theta, tx, tz)
-            population[i, :] = individual
-            pbar.update(1)
+            while True:  # Keep trying until a valid individual is generated
+                theta = np.random.uniform(min_values[0], max_values[0])
+                tx = np.random.uniform(min_values[1], max_values[1])
+                tz = np.random.uniform(min_values[2], max_values[2])
+                individual = f.individual_transitionspace(theta, tx, tz)
+                
+                if individual is not None:
+                    population[i, :] = individual
+                    pbar.update(1)
+                    break  # Exit the loop once a valid individual is found
+                else:
+                    # Log or print a message if needed
+                    print(f"Invalid individual generated: theta={theta}, tx={tx}, tz={tz}. Retrying...")
 
     archive = np.zeros((archive_size, 5))
 

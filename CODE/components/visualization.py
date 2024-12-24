@@ -69,15 +69,24 @@ def visualize_pareto_front(pereto_set):
     remote_cloud_o3d.colors = o3d.utility.Vector3dVector(remote_all_cloud_points[:, 3:6] / 255.0)
 
     # Visualize voxel loop as line segments
-    # voxel_keys = const.g_voxel_loops[transformation]
+    voxel_keys = const.g_voxel_loops[transformation]
     line_sets = []
     transformed_remote_voxels = utils.extract_voxels_hashmap(transformed_remote_cloud)
-    voxel_keys = set(const.g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
-    for key in voxel_keys:
+    all_voxel_keys = set(const.g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    for key in all_voxel_keys:
         voxel_center = voxel_centers(key)
         line_set = create_voxel_wireframe(voxel_center)
         line_set.paint_uniform_color([1.0, 0.0, 0.0])
         line_sets.append(line_set)
+
+    for key in voxel_keys:
+        voxel_center = voxel_centers(key)
+        voxel = o3d.geometry.TriangleMesh.create_box(width=const.g_grid_size,
+                                                     height=const.g_grid_size,
+                                                     depth=const.g_grid_size)
+        voxel.translate(voxel_center - (const.g_grid_size / 2.0))  # Center the box
+        voxel.paint_uniform_color([1.0, 0.0, 0.0])  # Red color
+        line_sets.append(voxel)
 
     print(f"voxel_keys num: {len(voxel_keys)}, tr: {pereto_set[0]}, {pereto_set[1]}, {pereto_set[2]}, obj1: {pereto_set[3]}, obj2: {pereto_set[4]}")
 
@@ -132,6 +141,10 @@ def visualize_pareto_front(pereto_set):
 
     for coords in shared_2d_coords:
         plt.plot(coords[:, 0], coords[:, 1], c='magenta', label="Shared Polygon")
+
+    # Draw voxel_keys in 2D
+    voxel_2d_coords = np.array([voxel_centers(key)[:2] for key in voxel_keys])  # Extract X and Z
+    plt.scatter(voxel_2d_coords[:, 0], voxel_2d_coords[:, 1], c='red', s=10, label="Voxel Keys")
 
     plt.xlabel("X")
     plt.ylabel("Z")

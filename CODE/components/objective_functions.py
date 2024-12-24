@@ -5,6 +5,7 @@ from heapq import heappop, heappush
 import components.geometry_utils as utils
 import components.constants as const
 from tqdm import tqdm
+import heapq
 
 
 def maximize_shared_space(rmt_polygon, rmt_trans):
@@ -18,6 +19,118 @@ def maximize_shared_space(rmt_polygon, rmt_trans):
         intersection_area = 0
 
     return intersection_area
+
+def heuristic(node, goal):
+    """Heuristic function: Manhattan distance in 3D."""
+    return abs(node[0] - goal[0]) + abs(node[1] - goal[1]) + abs(node[2] - goal[2])
+
+def a_star_3d(graph, start, goal):
+    # Priority queue: stores (f_cost, node)
+    pq = [(0, start)]
+    g_costs = {node: float('inf') for node in graph}
+    g_costs[start] = 0
+    came_from = {}
+    
+    while pq:
+        _, current = heapq.heappop(pq)
+        
+        # If the goal is reached, reconstruct the path
+        if current == goal:
+            path = []
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.append(start)
+            return path[::-1]  # Reverse the path
+        
+        # Explore neighbors
+        for neighbor, weight in graph[current].items():
+            g_cost = g_costs[current] + weight
+            f_cost = g_cost + heuristic(neighbor, goal)
+            
+            if g_cost < g_costs[neighbor]:
+                g_costs[neighbor] = g_cost
+                came_from[neighbor] = current
+                heapq.heappush(pq, (f_cost, neighbor))
+    
+    # If no path is found, raise a RuntimeError
+    raise RuntimeError(f"No path found from {start} to {goal}")
+
+
+def get_neighbors(keys, current_key):
+        """Find neighboring voxel keys."""
+        neighbors = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                for dz in [-1, 0, 1]:
+                    if dx == 0 and dy == 0 and dz == 0:
+                        continue
+                    neighbor = (current_key[0] + dx, current_key[1] + dy, current_key[2] + dz)
+                    if neighbor in keys:
+                        neighbors.append(neighbor)
+        return neighbors
+
+def build_graph(keys):
+    """Build a weighted graph from voxel keys."""
+    graph = defaultdict(dict)
+    # Convert to a set of tuples for efficient lookup
+    voxel_set = set(map(tuple, keys))
+    
+    for key in voxel_set:
+        neighbors = get_neighbors(voxel_set, key)
+        for neighbor in neighbors:
+            # Calculate weight using Manhattan distance
+            weight = abs(key[0] - neighbor[0]) + abs(key[1] - neighbor[1]) + abs(key[2] - neighbor[2])
+            graph[tuple(key)][tuple(neighbor)] = weight  # Ensure keys are tuples
+    
+    return graph
+
+def initialize_voxel_loop(voxel_keys):
+    voxel_keys = np.array(voxel_keys)
+
+    # Step 1: Group by x and find min/max z
+    x_groups = defaultdict(list)
+    for x, _, z in voxel_keys:
+        x_groups[x].append(z)
+
+    prims_xz_min = []  # ordered by x (small -> big)
+    prims_xz_max = []  # ordered by x (big -> small)
+
+    for x in sorted(x_groups.keys()):
+        z_values = sorted(set(x_groups[x]))
+        prims_xz_min.append([x, z_values[0]])
+        prims_xz_max.append([x, z_values[-1]])
+
+    prims_xz_max = sorted(prims_xz_max, reverse=True)  # ordered by x (big -> small)
+    prims_xz = prims_xz_min + prims_xz_max  # Combine min and max
+
+    # Step 2: Complete prims_xyz with smallest y
+    prims_xyz = []
+    for x, z in prims_xz:
+        # Filter voxel_keys to match x and z, then find smallest y
+        matching_voxels = [key for key in voxel_keys if key[0] == x and key[2] == z]
+        if matching_voxels:
+            smallest_y = min(matching_voxels, key=lambda key: key[1])[1]
+            prims_xyz.append((x, smallest_y, z))
+
+    graph = build_graph(voxel_keys)
+
+    # Step 3: Iteratively find the path
+    path = []
+    for i in range(len(prims_xyz) - 1):
+        sub_path = a_star_3d(graph, prims_xyz[i], prims_xyz[i + 1])
+        if sub_path:
+            # Append sub_path excluding the last node to avoid repetition
+            path.extend(sub_path[:-1])
+
+    # Close the loop by connecting back to the start
+    final_sub_path = a_star_3d(graph, prims_xyz[-1], prims_xyz[0])
+    if final_sub_path:
+        path.extend(final_sub_path)
+
+    print("Final path:", path)
+
+    return path
 
 def compute_color_discontinuity(local_points, remote_points):
     """Calculate average color discontinuity (Euclidean distance)."""
@@ -178,37 +291,42 @@ def minimize_discontinuities(keys, rmt_trans, rmt_voxels):
 
     # Save the best loop
     if best_loop:
-        const.g_voxel_loops[rmt_trans] = best_loop
+        #const.g_voxel_loops[rmt_trans] = best_loop
         print(f"Best loop saved: {best_loop}")
         return best_g_cost
     else:
         print("No valid loop found.")
         return float('inf')  # Penalty if no loop is formed
 
-
-
-
 def individual_transitionspace(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
     transformed_rmt_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, remote_transformation)
             
-    # # Compute shared space area using polygon with transformed remote space
-    # transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
-    # obj1 = -maximize_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
-    obj1 = 0
+    # Compute shared space area using polygon with transformed remote space
+    transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
+    obj1 = -maximize_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
+    # obj1 = 0
     
     # Extract voxels hashmap and overlapping hashmap keys for obj2
     transformed_remote_voxels = utils.extract_voxels_hashmap(transformed_rmt_cloud)
     overlapping_keys = set(const.g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
 
+    # for i in overlapping_keys:
+    #     print(i)
     # Compute discontinuities and embed the value
     #embeded_voxels = embed_discontinuities(overlapping_keys, transformed_remote_voxels)
 
+    # Initialize voxel loop
+    if len(overlapping_keys) == 0:
+        return None
+    overlapping_keys_list = list(overlapping_keys)
+    const.g_voxel_loops[remote_transformation] = initialize_voxel_loop(overlapping_keys_list)
+
     # Compute total discontinuities using voxelized hashmap
-    obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
+    #obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
     
-    # # obj1 test
-    # obj2 = 0
+    # obj1 test
+    obj2 = 0
     
     individual = [theta, tx, tz, obj1, obj2]
     return individual

@@ -55,7 +55,7 @@ DEFAULT_MIN_VALUES = [-180.0, -5.0, -5.0]
 DEFAULT_MAX_VALUES = [180.0, 5.0, 5.0]
 
 # SPEA2 parameters
-param_population_size = 20
-param_archive_size = 20
+param_population_size = 5
+param_archive_size = 5
 param_mutation_rate = 0.1
-param_generations = 50
+param_generations = 5
