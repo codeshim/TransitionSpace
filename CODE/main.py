@@ -5,6 +5,12 @@ import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
 from components.visualization import visualize_pareto_front
 
+
+"""
+Example:
+python CODE/main.py --loc Area_1_office_1.jsonl --rmt Area_5_office_39.jsonl --grid_size 0.2 --generation 1 --down_size 0.009
+"""
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--loc", type=str, required=True, help="Path to the local room JSONL file.")

@@ -6,6 +6,8 @@ import components.geometry_utils as utils
 import components.constants as const
 from tqdm import tqdm
 import heapq
+import random
+from copy import deepcopy
 
 
 def maximize_shared_space(rmt_polygon, rmt_trans):
@@ -131,6 +133,35 @@ def initialize_voxel_loop(voxel_keys):
     print("Final path:", path)
 
     return path
+
+def initialize_voxel_loop2(overlapping_keys, rmt_voxels):
+    # Step 1: Group by x and find min/max z
+    bound_xz = set()
+    for x, _, z in overlapping_keys:
+        bound_xz.add((x, z))
+
+    # Step 2: Select all y values if (x, z) is bounded by bound_xz and make extended_keys
+    extended_keys = set()
+    for x, z in bound_xz:
+        for y in range(
+            np.min([key[1] for key in const.g_local_voxels.keys() if key[0] == x and key[2] == z]),
+            np.max([key[1] for key in const.g_local_voxels.keys() if key[0] == x and key[2] == z]) + 1
+        ):
+            extended_keys.add((x, y, z))
+
+    directions = [(-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1)]  # 6-connectivity
+    boundary_keys = set()
+
+    for key in overlapping_keys:
+        for direction in directions:
+            neighbor = tuple([key[i] + direction[i] for i in range(3)])
+            if neighbor in const.g_local_voxels.keys() and neighbor not in extended_keys:
+                boundary_keys.add(key)
+                break  # No need to check other neighbors for this voxel
+
+    return boundary_keys
+
+    
 
 def compute_color_discontinuity(local_points, remote_points):
     """Calculate average color discontinuity (Euclidean distance)."""
@@ -319,8 +350,9 @@ def individual_transitionspace(theta, tx, tz):
     # Initialize voxel loop
     if len(overlapping_keys) == 0:
         return None
-    overlapping_keys_list = list(overlapping_keys)
-    const.g_voxel_loops[remote_transformation] = initialize_voxel_loop(overlapping_keys_list)
+    const.g_voxel_loops[remote_transformation] = initialize_voxel_loop2(overlapping_keys, transformed_remote_voxels)
+    #overlapping_keys_list = list(overlapping_keys)
+    #const.g_voxel_loops[remote_transformation] = initialize_voxel_loop(overlapping_keys_list)
 
     # Compute total discontinuities using voxelized hashmap
     #obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
