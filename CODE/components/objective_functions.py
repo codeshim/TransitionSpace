@@ -151,13 +151,13 @@ def initialize_voxel_loop2(overlapping_keys, rmt_voxels):
 
     directions = [(-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1)]  # 6-connectivity
     boundary_keys = set()
-
+    
     for key in overlapping_keys:
         for direction in directions:
             neighbor = tuple([key[i] + direction[i] for i in range(3)])
             if neighbor in const.g_local_voxels.keys() and neighbor not in extended_keys:
                 boundary_keys.add(key)
-                break  # No need to check other neighbors for this voxel
+                #break  # No need to check other neighbors for this voxel
 
     return boundary_keys
 

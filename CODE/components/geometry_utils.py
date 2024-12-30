@@ -118,6 +118,42 @@ def apply_points_transformation(group_clouds, centroid, transformation):
 
     return transformed_cloud
 
+def apply_transformation_points(points, transformation):
+    """
+    Apply a transformation to a point cloud based on rotation and translation.
+    """
+    theta, tx, tz = transformation
+    x_values = points[:, 0]  # X-axis values
+    z_values = points[:, 2]  # Z-axis values
+    centroid_x = np.mean(x_values)
+    centroid_z = np.mean(z_values)
+
+    # Convert theta to radians for computation
+    theta_rad = np.radians(theta)
+
+    # Step 1: Translate to origin (compute centroid of X and Z)
+    translated_points = np.copy(points)
+    translated_points[:, 0] -= centroid_x
+    translated_points[:, 2] -= centroid_z
+
+    # Step 2: Rotate around origin in the X-Z plane
+    rotation_matrix = np.array([
+        [np.cos(theta_rad), -np.sin(theta_rad)],
+        [np.sin(theta_rad),  np.cos(theta_rad)]
+    ])
+    rotated_xz = np.dot(translated_points[:, [0, 2]], rotation_matrix.T)
+
+    rotated_points = np.copy(translated_points)
+    rotated_points[:, 0] = rotated_xz[:, 0]
+    rotated_points[:, 2] = rotated_xz[:, 1]
+
+    # Step 3: Translate back with offset (tx, tz)
+    rotated_points[:, 0] += centroid_x + tx
+    rotated_points[:, 2] += centroid_z + tz
+
+    return rotated_points
+
+
 
 def clean_polygon(polygon):
     """
@@ -165,5 +201,13 @@ def extract_voxels_hashmap(group_clouds):
         for point in points:
             voxel_key = tuple((point[:3] // const.g_grid_size).astype(int))
             hash_map[voxel_key].append(point)
+
+    return hash_map
+
+def extract_voxels_hashmap_points(grid_size, points):
+    hash_map = defaultdict(list)
+    for point in points:
+        voxel_key = tuple((point[:3] // grid_size).astype(int))
+        hash_map[voxel_key].append(point)
 
     return hash_map

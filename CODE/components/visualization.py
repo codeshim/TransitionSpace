@@ -40,6 +40,53 @@ def create_voxel_wireframe(center):
     line_set.lines = o3d.utility.Vector2iVector(lines)
     return line_set
 
+def draw_voxel_wireframe(keys, grid_size, colors):
+    # Define the 12 edges connecting the corners
+    lines = [
+        [0, 1], [0, 2], [0, 4],
+        [1, 3], [1, 5],
+        [2, 3], [2, 6],
+        [3, 7],
+        [4, 5], [4, 6],
+        [5, 7],
+        [6, 7]
+    ]
+    line_sets = []
+    for key in keys:
+        center = np.array(key) * grid_size + (grid_size / 2.0)
+        half_size = grid_size / 2.0
+        corners = [
+            center + np.array([half_size, half_size, half_size]),
+            center + np.array([half_size, half_size, -half_size]),
+            center + np.array([half_size, -half_size, half_size]),
+            center + np.array([half_size, -half_size, -half_size]),
+            center + np.array([-half_size, half_size, half_size]),
+            center + np.array([-half_size, half_size, -half_size]),
+            center + np.array([-half_size, -half_size, half_size]),
+            center + np.array([-half_size, -half_size, -half_size])
+        ]      
+
+        # Create a LineSet object from the corners and lines
+        line_set = o3d.geometry.LineSet()
+        line_set.points = o3d.utility.Vector3dVector(corners)
+        line_set.lines = o3d.utility.Vector2iVector(lines)
+        line_set.paint_uniform_color(colors)
+        line_sets.append(line_set)
+
+    return line_sets
+
+def draw_voxel_box(keys, grid_size, colors):
+    boxes = []
+    for key in keys:
+        center = np.array(key) * grid_size + (grid_size / 2.0)
+        box = o3d.geometry.TriangleMesh.create_box(width=grid_size, height=grid_size, depth=grid_size)
+        box.translate(center - (grid_size / 2.0))  # Center the box
+        box.paint_uniform_color(colors)
+        boxes.append(box)
+    
+    return boxes
+
+
 def visualize_pareto_front(pereto_set):
     """
     Visualize the best result (pereto_set[0]) with Open3D and matplotlib.
