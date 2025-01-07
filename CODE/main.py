@@ -4,7 +4,6 @@ import components.geometry_utils as utils
 import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
 from components.visualization import visualize_and_record_pareto_front
-from components.record import save_report
 
 
 """
@@ -23,8 +22,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load point clouds
-    const.g_local_cloud = jsonl_to_group_clouds(args.loc)  
-    const.g_remote_cloud = jsonl_to_group_clouds(args.rmt)
+    const.g_loc_name = args.loc
+    const.g_rmt_name = args.rmt
+    const.g_local_cloud = jsonl_to_group_clouds(const.g_loc_name)  
+    const.g_remote_cloud = jsonl_to_group_clouds(const.g_rmt_name)
 
     # Downsample point clouds
     const.g_down_size = args.down_size
@@ -34,10 +35,21 @@ if __name__ == "__main__":
     # Initialize global values(constants)
     const.g_grid_size = args.grid_size
     const.param_generations = args.generation
-    const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
-    #const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
-    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)
     const.g_remote_centroid = utils.get_cloud_centroid(const.g_remote_cloud)
+
+    # Polygon
+    #const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
+
+    # Voxel
+    const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
+    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)
+    rmt_strt_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_structure_categories)
+    rmt_feat_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_feature_categories)
+    const.g_obj1_min = 0.0
+    const.g_obj1_max = min(len(const.g_loc_strt_voxels), len(rmt_strt_voxels))
+    const.g_obj2_min = 0.0
+    const.g_obj2_max = min(len(const.g_loc_feat_voxels), len(rmt_feat_voxels))
+    
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
     pareto_front = strength_pareto_evolutionary_algorithm_2(
@@ -49,7 +61,11 @@ if __name__ == "__main__":
                     generations=const.param_generations,
                     verbose=False,)
     
+    const.g_best_tr = pareto_front[:3]
+    const.g_best_obj1 = pareto_front[3]
+    const.g_best_obj1 = pareto_front[4]
+    
     # visualize pareto_front[0]
-    visualize_and_record_pareto_front(pareto_front[0], record=True)
+    visualize_and_record_pareto_front(record=True)
     # temp = [60.0, 2.5, 1.0]
     # visualize_pareto_front(temp)

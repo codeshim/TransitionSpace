@@ -88,11 +88,10 @@ def draw_voxel_box(keys, grid_size, colors):
     
     return boxes
 
-def visualize_and_record_pareto_front(pereto_set, record=True):
-    print(f"tr: {pereto_set[0]}, {pereto_set[1]}, {pereto_set[2]}, obj1: {pereto_set[3]}, obj2: {pereto_set[4]}")
+def visualize_and_record_pareto_front(record=True):
+    print(f"tr: {const.g_best_tr}, obj1: {const.g_best_obj1}, obj2: {const.g_best_obj2}")
     # Extract the transformation from pereto_set[0]
-    theta, tx, tz = pereto_set[:3]
-    transformation = (theta, tx, tz)
+    transformation = tuple(const.g_best_tr)
 
     # Apply transformation to the remote cloud
     transformed_remote_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, transformation)
@@ -214,11 +213,7 @@ def visualize_and_record_pareto_front(pereto_set, record=True):
     # Show the plot
     plt.show()
     
-
     if record:
-        const.g_best_tr = transformation
-        const.g_best_obj1 = pereto_set[3]
-        const.g_best_obj2 = pereto_set[4]
         rec.save_report()
 
 

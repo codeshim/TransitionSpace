@@ -47,6 +47,11 @@ def save_report():
     ==========================
     Start Time: {formatted_start_time()}
 
+    Datas:
+    --------------------------
+    Local Space: {const.g_loc_name}
+    Remote Space: {const.g_rmt_name}
+
     Results:
     --------------------------
     Transformation: {const.g_best_tr}

@@ -245,10 +245,22 @@ def strength_pareto_evolutionary_algorithm_2(
         archive = combined_population[:archive_size, :]
 
         # Save the best individual's obj1 and obj2
-        best_individual = archive[0]  # Assuming the first individual is the best
+        ideal_point = np.array([0.0, 0.0])                                  # Define ideal point (normalized space)
+        distances = np.linalg.norm(archive[:, 3:5] - ideal_point, axis=1)   # Calculate distances
+
+        print("\nDebug: Distances to ideal point:")
+        for i, dist in enumerate(distances):
+            print(f"Individual {i}: Distance = {dist}")
+
+        best_index = np.argmin(distances)                                   # Find the index closest to ideal point
+        best_individual = archive[best_index]                               # Select the best individual
+
+        print(f"\nDebug: Best index = {best_index}, Minimum distance = {distances[best_index]}")
+
         print(f"best individual: obj1({best_individual[3]}), obj2({best_individual[4]})")
         const.g_best_obj1_list.append(best_individual[3])
         const.g_best_obj2_list.append(best_individual[4])
+        
 
         # Generate offspring
         if verbose:
@@ -279,4 +291,4 @@ def strength_pareto_evolutionary_algorithm_2(
     print(f"\nTotal time for {generations} generations: {const.g_total_elapsed_time:.2f} seconds.")
     print(f"Average time per generation: {const.g_average_generation_time:.2f} seconds.")
 
-    return archive
+    return best_individual
