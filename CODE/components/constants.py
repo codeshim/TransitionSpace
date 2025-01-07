@@ -36,7 +36,9 @@ CATEGORY_COLORS = {
 # Default global values for point cloud and optimization operations
 g_local_cloud = []
 g_local_polygon = None
-g_local_voxels = None
+#g_local_voxels = None
+g_loc_strt_voxels = None
+g_loc_feat_voxels = None
 g_remote_cloud = []
 g_remote_centroid = None
 g_down_size = 0.05
@@ -46,16 +48,32 @@ g_excluded_categories = [
     "wall", "column", "window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"
 ]
 
+g_structure_categories = ["ceiling", "floor", "wall", "beam", "column"]
+g_feature_categories = ["window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
+
+
 # Storage for optimization-related data
-g_voxel_loops = defaultdict(list)
+#g_voxel_loops = defaultdict(list)
 g_shared_polygon = defaultdict(list)
+g_overlap_strt_voxels = defaultdict(list)
+g_overlap_feat_voxels = defaultdict(list)
 
 # Bounds for optimization variables
-DEFAULT_MIN_VALUES = [-180.0, -5.0, -5.0]
-DEFAULT_MAX_VALUES = [180.0, 5.0, 5.0]
+DEFAULT_MIN_VALUES = [-180.0, -6.0, -6.0]
+DEFAULT_MAX_VALUES = [180.0, 6.0, 6.0]
 
 # SPEA2 parameters
-param_population_size = 5
-param_archive_size = 5
-param_mutation_rate = 0.1
-param_generations = 5
+param_population_size = 20
+param_archive_size = 20
+param_mutation_rate = 0.2
+param_generations = 50
+
+g_best_tr = []
+g_best_obj1 = 0.0
+g_best_obj2 = 0.0
+g_best_obj1_list = []
+g_best_obj2_list = []
+
+g_total_start_time = 0.0
+g_total_elapsed_time = 0.0
+g_average_generation_time = 0.0

@@ -3,7 +3,8 @@ from components.S3DIS_to_json import jsonl_to_group_clouds
 import components.geometry_utils as utils
 import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
-from components.visualization import visualize_pareto_front
+from components.visualization import visualize_and_record_pareto_front
+from components.record import save_report
 
 
 """
@@ -34,7 +35,8 @@ if __name__ == "__main__":
     const.g_grid_size = args.grid_size
     const.param_generations = args.generation
     const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
-    const.g_local_voxels = utils.extract_voxels_hashmap(const.g_local_cloud)
+    #const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
+    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)
     const.g_remote_centroid = utils.get_cloud_centroid(const.g_remote_cloud)
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
@@ -45,9 +47,9 @@ if __name__ == "__main__":
                     min_values=const.DEFAULT_MIN_VALUES,
                     max_values=const.DEFAULT_MAX_VALUES,
                     generations=const.param_generations,
-                    verbose=True,)
+                    verbose=False,)
     
     # visualize pareto_front[0]
-    visualize_pareto_front(pareto_front[0])
+    visualize_and_record_pareto_front(pareto_front[0], record=True)
     # temp = [60.0, 2.5, 1.0]
     # visualize_pareto_front(temp)

@@ -10,17 +10,16 @@ import random
 from copy import deepcopy
 
 
-def maximize_shared_space(rmt_polygon, rmt_trans):
+def calculate_shared_space(rmt_polygon, rmt_trans):
     try:
         intersection = const.g_local_polygon.intersection(rmt_polygon)
         intersection = utils.clean_polygon(intersection)
         intersection_area = intersection.area
-        const.g_shared_polygon[rmt_trans].append(intersection)
     except Exception as e:
         print(f"Warning: Intersection failed for polygons. Using area 0.")
         intersection_area = 0
 
-    return intersection_area
+    return intersection_area, intersection
 
 def heuristic(node, goal):
     """Heuristic function: Manhattan distance in 3D."""
@@ -86,80 +85,6 @@ def build_graph(keys):
             graph[tuple(key)][tuple(neighbor)] = weight  # Ensure keys are tuples
     
     return graph
-
-def initialize_voxel_loop(voxel_keys):
-    voxel_keys = np.array(voxel_keys)
-
-    # Step 1: Group by x and find min/max z
-    x_groups = defaultdict(list)
-    for x, _, z in voxel_keys:
-        x_groups[x].append(z)
-
-    prims_xz_min = []  # ordered by x (small -> big)
-    prims_xz_max = []  # ordered by x (big -> small)
-
-    for x in sorted(x_groups.keys()):
-        z_values = sorted(set(x_groups[x]))
-        prims_xz_min.append([x, z_values[0]])
-        prims_xz_max.append([x, z_values[-1]])
-
-    prims_xz_max = sorted(prims_xz_max, reverse=True)  # ordered by x (big -> small)
-    prims_xz = prims_xz_min + prims_xz_max  # Combine min and max
-
-    # Step 2: Complete prims_xyz with smallest y
-    prims_xyz = []
-    for x, z in prims_xz:
-        # Filter voxel_keys to match x and z, then find smallest y
-        matching_voxels = [key for key in voxel_keys if key[0] == x and key[2] == z]
-        if matching_voxels:
-            smallest_y = min(matching_voxels, key=lambda key: key[1])[1]
-            prims_xyz.append((x, smallest_y, z))
-
-    graph = build_graph(voxel_keys)
-
-    # Step 3: Iteratively find the path
-    path = []
-    for i in range(len(prims_xyz) - 1):
-        sub_path = a_star_3d(graph, prims_xyz[i], prims_xyz[i + 1])
-        if sub_path:
-            # Append sub_path excluding the last node to avoid repetition
-            path.extend(sub_path[:-1])
-
-    # Close the loop by connecting back to the start
-    final_sub_path = a_star_3d(graph, prims_xyz[-1], prims_xyz[0])
-    if final_sub_path:
-        path.extend(final_sub_path)
-
-    print("Final path:", path)
-
-    return path
-
-def initialize_voxel_loop2(overlapping_keys, rmt_voxels):
-    # Step 1: Group by x and find min/max z
-    bound_xz = set()
-    for x, _, z in overlapping_keys:
-        bound_xz.add((x, z))
-
-    # Step 2: Select all y values if (x, z) is bounded by bound_xz and make extended_keys
-    extended_keys = set()
-    for x, z in bound_xz:
-        for y in range(
-            np.min([key[1] for key in const.g_local_voxels.keys() if key[0] == x and key[2] == z]),
-            np.max([key[1] for key in const.g_local_voxels.keys() if key[0] == x and key[2] == z]) + 1
-        ):
-            extended_keys.add((x, y, z))
-
-    directions = [(-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1)]  # 6-connectivity
-    boundary_keys = set()
-    
-    for key in overlapping_keys:
-        for direction in directions:
-            neighbor = tuple([key[i] + direction[i] for i in range(3)])
-            if neighbor in const.g_local_voxels.keys() and neighbor not in extended_keys:
-                boundary_keys.add(key)
-                #break  # No need to check other neighbors for this voxel
-
-    return boundary_keys
 
     
 
@@ -247,87 +172,6 @@ def embed_discontinuities(keys, rmt_voxels):
         # print(f"key: {key}, color_cost: {color_cost}, geometry_cost: {geometry_cost}")
     return embeded_voxels
 
-# Nested optimization
-def minimize_discontinuities(keys, rmt_trans, rmt_voxels):
-    # Precompute and store discontinuity values in embedded_voxels
-    embedded_voxels = embed_discontinuities(keys, rmt_voxels)
-    print(f"Embedded voxels count: {len(embedded_voxels)}")
-
-    def get_neighbors(current_key):
-        """Find neighboring voxel keys."""
-        neighbors = []
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                for dz in [-1, 0, 1]:
-                    if dx == 0 and dy == 0 and dz == 0:
-                        continue
-                    neighbor = (current_key[0] + dx, current_key[1] + dy, current_key[2] + dz)
-                    if neighbor in keys:
-                        neighbors.append(neighbor)
-        return neighbors
-
-    best_g_cost = float('inf')
-    best_loop = None
-
-    # Iterate through all possible start keys
-    for start_key in tqdm(keys, desc="Processing start keys"):
-        open_list = []
-        closed_list = set()
-        parent_map = {}
-        g_cost = {key: float('inf') for key in keys}
-        f_cost = {key: float('inf') for key in keys}
-
-        # Start node initialization
-        g_cost[start_key] = 0
-        f_cost[start_key] = 0
-        heappush(open_list, (f_cost[start_key], start_key))
-
-        while open_list:
-            _, current_key = heappop(open_list)
-
-            if current_key in closed_list:
-                continue
-
-            closed_list.add(current_key)
-
-            for neighbor in get_neighbors(current_key):
-                if neighbor in closed_list:
-                    continue
-
-                # Compute cost for neighbor
-                neighbor_cost = embedded_voxels[neighbor]
-                tentative_g_cost = g_cost[current_key] + neighbor_cost
-
-                # Update costs if better path is found
-                if tentative_g_cost < g_cost[neighbor]:
-                    parent_map[neighbor] = current_key
-                    g_cost[neighbor] = tentative_g_cost
-                    f_cost[neighbor] = tentative_g_cost
-                    heappush(open_list, (f_cost[neighbor], neighbor))
-
-            # Reconstruct the loop
-            loop = []
-            node = current_key
-            while node in parent_map:
-                loop.append(node)
-                node = parent_map[node]
-
-            # Close the loop if possible
-            if len(loop) >= 10 and loop[-1] == start_key:
-                total_discontinuity = sum(embedded_voxels[key] for key in loop)
-                if total_discontinuity < best_g_cost:
-                    best_g_cost = total_discontinuity
-                    best_loop = loop
-                    print(f"New best loop found: {best_loop}, Cost: {best_g_cost}")
-
-    # Save the best loop
-    if best_loop:
-        #const.g_voxel_loops[rmt_trans] = best_loop
-        print(f"Best loop saved: {best_loop}")
-        return best_g_cost
-    else:
-        print("No valid loop found.")
-        return float('inf')  # Penalty if no loop is formed
 
 def individual_transitionspace(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
@@ -335,30 +179,55 @@ def individual_transitionspace(theta, tx, tz):
             
     # Compute shared space area using polygon with transformed remote space
     transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
-    obj1 = -maximize_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
-    # obj1 = 0
+    area, shared_space = calculate_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
+    obj1 = -area
+
+    # Extract voxels hashmap of transformed remote space
+    # trans_rmt_strt_voxels = utils.extract_selected_voxels_keys(
+    #     transformed_rmt_cloud, const.g_structure_categories)
+    # trans_rmt_feat_voxels = utils.extract_selected_voxels_keys(
+    #     transformed_rmt_cloud, const.g_feature_categories)
     
-    # Extract voxels hashmap and overlapping hashmap keys for obj2
-    transformed_remote_voxels = utils.extract_voxels_hashmap(transformed_rmt_cloud)
-    overlapping_keys = set(const.g_local_voxels.keys()).intersection(set(transformed_remote_voxels.keys()))
+    # maximize overlapped structures
+    # if const.g_loc_strt_voxels.ndim == 2 and trans_rmt_strt_voxels.ndim == 2:
+    #     # View arrays as 1D structured arrays for row-wise comparison
+    #     loc_voxels = const.g_loc_strt_voxels.view([('', const.g_loc_strt_voxels.dtype)] * const.g_loc_strt_voxels.shape[1])
+    #     trans_voxels = trans_rmt_strt_voxels.view([('', trans_rmt_strt_voxels.dtype)] * trans_rmt_strt_voxels.shape[1])
 
-    # for i in overlapping_keys:
-    #     print(i)
-    # Compute discontinuities and embed the value
-    #embeded_voxels = embed_discontinuities(overlapping_keys, transformed_remote_voxels)
+    #     # Find the intersection of rows
+    #     overlapping_strt_voxels = np.intersect1d(loc_voxels, trans_voxels)
 
-    # Initialize voxel loop
-    if len(overlapping_keys) == 0:
+    #     # Convert back to 2D array if needed
+    #     overlapping_strt_voxels = overlapping_strt_voxels.view(const.g_loc_strt_voxels.dtype).reshape(-1, const.g_loc_strt_voxels.shape[1])
+    # else:
+    #     raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
+    
+    #obj1 = -len(overlapping_strt_voxels)
+
+
+    if obj1 == 0:
         return None
-    const.g_voxel_loops[remote_transformation] = initialize_voxel_loop2(overlapping_keys, transformed_remote_voxels)
-    #overlapping_keys_list = list(overlapping_keys)
-    #const.g_voxel_loops[remote_transformation] = initialize_voxel_loop(overlapping_keys_list)
 
-    # Compute total discontinuities using voxelized hashmap
-    #obj2 = minimize_discontinuities(overlapping_keys, remote_transformation, transformed_remote_voxels)
-    
-    # obj1 test
+    # minimize overlapped features
+    # if const.g_loc_feat_voxels.ndim == 2 and trans_rmt_feat_voxels.ndim == 2:
+    #     # View arrays as 1D structured arrays for row-wise comparison
+    #     loc_voxels = const.g_loc_feat_voxels.view([('', const.g_loc_feat_voxels.dtype)] * const.g_loc_feat_voxels.shape[1])
+    #     trans_voxels = trans_rmt_feat_voxels.view([('', trans_rmt_feat_voxels.dtype)] * trans_rmt_feat_voxels.shape[1])
+
+    #     # Find the intersection of rows
+    #     overlapping_feat_voxels = np.intersect1d(loc_voxels, trans_voxels)
+
+    #     # Convert back to 2D array if needed
+    #     overlapping_feat_voxels = overlapping_feat_voxels.view(const.g_loc_feat_voxels.dtype).reshape(-1, const.g_loc_feat_voxels.shape[1])
+    # else:
+    #     raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
+    #obj2 = len(overlapping_feat_voxels)
     obj2 = 0
-    
+    # Save the overlapped voxels
+    const.g_shared_polygon[remote_transformation] = shared_space
+    #const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
+    #const.g_overlap_feat_voxels[remote_transformation] = overlapping_feat_voxels
+
     individual = [theta, tx, tz, obj1, obj2]
+    #print(f"individual: theta({theta}), tx({tx}), tz({tz}), obj1({obj1}), obj2({obj2})")
     return individual

@@ -154,7 +154,6 @@ def apply_transformation_points(points, transformation):
     return rotated_points
 
 
-
 def clean_polygon(polygon):
     """
     Clean and validate a polygon, handling any topological errors.
@@ -211,3 +210,61 @@ def extract_voxels_hashmap_points(grid_size, points):
         hash_map[voxel_key].append(point)
 
     return hash_map
+
+def extract_selected_voxels_keys(group_clouds, selected_group):
+    voxel_keys = [] 
+
+    for category, points in group_clouds:
+        if category in selected_group:
+            for point in points:
+                voxel_key = (point[:3] // const.g_grid_size).astype(int)
+                voxel_keys.append(voxel_key)
+
+    # Combine all keys into a single NumPy array
+    if voxel_keys:
+        voxel_keys = np.vstack(voxel_keys)
+        voxel_keys = np.unique(voxel_keys, axis=0)  # Remove duplicates
+    else:
+        voxel_keys = np.empty((0, 3), dtype=int)    # Return empty array if no keys
+
+    return voxel_keys
+    # """
+    # Extract unique voxel keys (x, y, z) occupied by the point cloud,
+    # filtering only points belonging to categories in the selected_group.
+    # Returns a NumPy array of unique voxel keys.
+    # """
+    # voxel_keys = []  # Collect voxel keys as a list
+    # for category, points in group_clouds:
+    #     # Check if the category is in the selected group
+    #     #print(f"category: {category}")
+    #     #print(f"points: {points}, points.shape: {points.shape}")
+    #     """
+    #     category: chair
+    #     points: [[  1.86225      0.587        1.891       96.         102.
+    #       106.        ]
+    #      [  1.86373333   0.59446667   1.86233333 104.         109.
+    #       116.        ]
+    #      [  1.848        0.797        2.187      115.         117.
+    #        96.        ]
+    #      ...
+    #      [  1.84118519   0.21211111   2.01640741  51.          53.
+    #        45.        ]
+    #      [  1.65233333   0.51591667   2.09158333  70.          71.
+    #        66.        ]
+    #      [  1.69814286   0.59910714   2.1155      73.          77.
+    #        84.        ]], points.shape: (618, 6)
+    #     """
+    #     if category in selected_group:
+    #         # Calculate voxel keys for all points in this category
+    #         for point in points:
+    #             keys = (point[:3] // grid_size).astype(int)
+    #             voxel_keys.append(keys)
+
+    # # Combine all keys into a single NumPy array
+    # if voxel_keys:
+    #     voxel_keys = np.vstack(voxel_keys)
+    #     voxel_keys = np.unique(voxel_keys, axis=0)  # Remove duplicates
+    # else:
+    #     voxel_keys = np.empty((0, 3), dtype=int)    # Return empty array if no keys
+
+    # return voxel_keys

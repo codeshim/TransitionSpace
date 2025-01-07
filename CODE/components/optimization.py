@@ -16,6 +16,8 @@ import numpy as np
 import random
 from tqdm import tqdm
 import components.objective_functions as f
+import components.constants as const
+import time
 
 def dominance_function(solution_1, solution_2, number_of_functions=2):
     """
@@ -198,28 +200,32 @@ def strength_pareto_evolutionary_algorithm_2(
     if verbose:
         print("Initializing population...")
     population = np.zeros((population_size, 5))
-    with tqdm(total=population_size, desc="Initializing population") as pbar:
-        for i in range(population_size):
-            while True:  # Keep trying until a valid individual is generated
-                theta = np.random.uniform(min_values[0], max_values[0])
-                tx = np.random.uniform(min_values[1], max_values[1])
-                tz = np.random.uniform(min_values[2], max_values[2])
-                individual = f.individual_transitionspace(theta, tx, tz)
-                
-                if individual is not None:
-                    population[i, :] = individual
-                    pbar.update(1)
-                    break  # Exit the loop once a valid individual is found
-                else:
-                    # Log or print a message if needed
-                    print(f"Invalid individual generated: theta={theta}, tx={tx}, tz={tz}. Retrying...")
+    for i in range(population_size):
+        while True:  # Keep trying until a valid individual is generated
+            theta = np.random.uniform(min_values[0], max_values[0])
+            tx = np.random.uniform(min_values[1], max_values[1])
+            tz = np.random.uniform(min_values[2], max_values[2])
+            individual = f.individual_transitionspace(theta, tx, tz)
 
+            if individual is not None:
+                population[i, :] = individual
+                break  # Exit the loop once a valid individual is found
+            else:
+                # Log or print a message if needed
+                print(f"Invalid individual generated: theta={theta}, tx={tx}, tz={tz}. Retrying...")
     archive = np.zeros((archive_size, 5))
 
+    # Start timing for the entire process
+    const.g_total_start_time = time.time()
+
     # Main loop for generations
-    for generation in tqdm(range(generations), desc="Generations", leave=True):
+    for generation in tqdm(range(generations), desc="Generations", unit="gen"):
         if verbose:
             print(f"Processing Generation {generation}...")
+        
+        # Start timing for this generation
+        start_time = time.time()
+        generation_times = []
 
         # Combine population and archive
         combined_population = np.vstack([population, archive])
@@ -227,39 +233,50 @@ def strength_pareto_evolutionary_algorithm_2(
         # Calculate raw fitness and fitness
         if verbose:
             print("Calculating fitness...")
-        with tqdm(total=len(combined_population), desc="Calculating fitness") as pbar:
-            raw_fitness = raw_fitness_function(combined_population)
-            fitness = fitness_calculation(combined_population, raw_fitness)
-            pbar.update(len(combined_population))
+        raw_fitness = raw_fitness_function(combined_population)
+        fitness = fitness_calculation(combined_population, raw_fitness)
 
         # Sort population by fitness
         if verbose:
             print("Sorting population by fitness...")
-        combined_population, fitness = sort_population_by_fitness(
-            combined_population, fitness
-        )
+        combined_population, fitness = sort_population_by_fitness(combined_population, fitness)
 
         # Select top individuals for archive
         archive = combined_population[:archive_size, :]
 
+        # Save the best individual's obj1 and obj2
+        best_individual = archive[0]  # Assuming the first individual is the best
+        print(f"best individual: obj1({best_individual[3]}), obj2({best_individual[4]})")
+        const.g_best_obj1_list.append(best_individual[3])
+        const.g_best_obj2_list.append(best_individual[4])
+
         # Generate offspring
         if verbose:
             print("Breeding population...")
-        with tqdm(total=population_size, desc="Breeding population") as pbar:
-            population = breeding(
-                combined_population[:population_size, :],
-                fitness[:population_size, :],
-                mutation_rate,
-                min_values,
-                max_values,
-            )
-            pbar.update(population_size)
+        population = breeding(
+                    combined_population[:population_size, :],
+                    fitness[:population_size, :],
+                    mutation_rate,
+                    min_values,
+                    max_values,
+                    )
 
         # Apply mutation
         if verbose:
             print("Applying mutation...")
-        with tqdm(total=population_size, desc="Mutating population") as pbar:
-            population = mutation(population, mutation_rate, min_values, max_values)
-            pbar.update(population_size)
+        population = mutation(population, mutation_rate, min_values, max_values)
+
+        # End timing for this generation
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        generation_times.append(elapsed_time)
+
+    # End timing for the entire process
+    total_end_time = time.time()
+    const.g_total_elapsed_time = total_end_time - const.g_total_start_time
+    const.g_average_generation_time = sum(generation_times) / len(generation_times)
+
+    print(f"\nTotal time for {generations} generations: {const.g_total_elapsed_time:.2f} seconds.")
+    print(f"Average time per generation: {const.g_average_generation_time:.2f} seconds.")
 
     return archive

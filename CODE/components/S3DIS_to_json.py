@@ -24,6 +24,9 @@ def load_point_cloud_data(directory):
                 os.path.join(root, file) for file in files if file.endswith(".txt")
             )
 
+    group_clouds = []  # Initialize as empty
+    folder_name = None  # Initialize folder_name
+
     for group_dir, files in annotation_groups.items():
         group_clouds = []
         folder_name = os.path.basename(os.path.dirname(group_dir))
@@ -35,6 +38,9 @@ def load_point_cloud_data(directory):
                 continue
             data = np.loadtxt(file, dtype=float)
             group_clouds.append((category_name, data))
+
+    if folder_name is None:
+        raise ValueError(f"No valid folder found in directory: {directory}")
 
     return folder_name, group_clouds
 
@@ -195,16 +201,32 @@ def visualize(group_clouds):
     vis.run()
     vis.destroy_window()
 
+def write_as_xyz(group_clouds, output_file):
+    """
+    Save the point clouds as an XYZ file.
+    Each line of the file will have: X Y Z R G B.
+    """
+    with open(output_file, 'w') as f:
+        for _, points in group_clouds:
+            for point in points:
+                # Assuming the points array has columns X, Y, Z, R, G, B
+                x, y, z, r, g, b = point[:6]
+                f.write(f"{x:.8f} {y:.8f} {z:.8f} {int(r)} {int(g)} {int(b)}\n")
+    print(f"Point cloud data saved to {output_file}")
+
+
 if __name__ == "__main__":
     """
     Example
-    python CODE/S3DIS_to_json.py -w --folder Area_1_office_1
-    python CODE/S3DIS_to_json.py -r --jsonl Area_1_office_1.jsonl
+    python CODE/components/S3DIS_to_json.py -w --folder Area_1_office_1
+    python CODE/components/S3DIS_to_json.py -r --jsonl Area_1_office_1.jsonl
+    python CODE/components/S3DIS_to_json.py -w --folder Area_1_office_1 -xyz
     """
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", action="store_true", help="Write mode: Save the point cloud data as jsonl.")
     parser.add_argument("-r", action="store_true", help="Read mode: Visualize point cloud data from a jsonl file.")
+    parser.add_argument("-xyz", action="store_true", help="Save the point cloud data as an XYZ file.")
     parser.add_argument("--folder", type=str, help="Path to the folder containing point cloud data (required in write mode).")
     parser.add_argument("--jsonl", type=str, help="Path to a jsonl file to read and visualize (required in read mode).")
 
@@ -215,7 +237,11 @@ if __name__ == "__main__":
             print("Error: --folder is required in write mode (-w).")
         else:
             write_as_jsonl(args.folder)
-
+            if args.xyz:
+                # Load group clouds after writing JSONL
+                folder_name, group_clouds = load_point_cloud_data(args.folder)
+                output_file = f"{JSONL_DIR}/{folder_name}.xyz"
+                write_as_xyz(group_clouds, output_file)
     elif args.r:
         if not args.jsonl:
             print("Error: --jsonl is required in read mode (-r).")
