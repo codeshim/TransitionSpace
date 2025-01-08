@@ -43,29 +43,56 @@ import components.constants as const
 
 def downsample_points(group_clouds, voxel_size=0.05):
     down_group_clouds = []
+    total_original_points = 0
+    total_downsampled_points = 0
+    
+    print("\nDownsampling Statistics:")
+    print("-" * 50)
+    
     for category_name, points in group_clouds:
-        # Downsampling
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(points[:, :3])
-        pcd.colors = o3d.utility.Vector3dVector(points[:, 3:6] / 255.0)
-        down_pcd = pcd.voxel_down_sample(voxel_size)
+        try:
+            original_count = len(points)
+            total_original_points += original_count
+            
+            # Create point cloud
+            pcd = o3d.geometry.PointCloud()
+            xyz = points[:, :3].astype(np.float64)
+            rgb = points[:, 3:6].astype(np.float64) / 255.0
+            pcd.points = o3d.utility.Vector3dVector(xyz)
+            pcd.colors = o3d.utility.Vector3dVector(rgb)
+            
+            # Downsample
+            down_pcd = pcd.voxel_down_sample(voxel_size)
+            
+            # Convert back
+            down_points = np.asarray(down_pcd.points)
+            down_colors = (np.asarray(down_pcd.colors) * 255).astype(np.uint8)
+            downsampled_data = np.hstack((down_points, down_colors))
+            
+            downsampled_count = len(down_points)
+            total_downsampled_points += downsampled_count
+            
+            reduction = original_count - downsampled_count
+            
+            down_group_clouds.append((category_name, downsampled_data))
+            
+            del pcd
+            del down_pcd
+            
+        except Exception as e:
+            print(f"Error processing category {category_name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
-        # # Print detailed information
-        # original_count = len(pcd.points)
-        # downsampled_count = len(down_pcd.points)
-        # reduced_count = original_count - downsampled_count
-        # reduction_percentage = (reduced_count / original_count) * 100 if original_count > 0 else 0
-        # print(f"Category: {category_name}")
-        # print(f"  Original points: {original_count}")
-        # print(f"  Downsampled points: {downsampled_count}")
-        # print(f"  Points reduced: {reduced_count} ({reduction_percentage:.2f}%)")
-        
-        # Append back to the result dictionary
-        down_points = np.asarray(down_pcd.points)
-        down_colors = (np.asarray(down_pcd.colors) * 255).astype(np.uint8)
-        downsampled_data = np.hstack((down_points, down_colors))
-        down_group_clouds.append((category_name, downsampled_data))
-
+    # Print total statistics
+    total_reduction = total_original_points - total_downsampled_points
+    total_reduction_percentage = (total_reduction / total_original_points) * 100
+    print("\nTotal Statistics:")
+    print(f"Total original points: {total_original_points:,}")
+    print(f"Total downsampled points: {total_downsampled_points:,}")
+    print(f"Total reduction: {total_reduction:,} points ({total_reduction_percentage:.1f}%)")
+    
     return down_group_clouds
 
 

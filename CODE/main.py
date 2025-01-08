@@ -4,6 +4,7 @@ import components.geometry_utils as utils
 import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
 from components.visualization import visualize_and_record_pareto_front
+import open3d as o3d
 
 
 """
@@ -22,12 +23,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load point clouds
+    print("\nLoading clouds...")
     const.g_loc_name = args.loc
     const.g_rmt_name = args.rmt
     const.g_local_cloud = jsonl_to_group_clouds(const.g_loc_name)  
     const.g_remote_cloud = jsonl_to_group_clouds(const.g_rmt_name)
 
     # Downsample point clouds
+    print("\nDownsampling clouds...")
     const.g_down_size = args.down_size
     const.g_local_cloud = utils.downsample_points(const.g_local_cloud)
     const.g_remote_cloud = utils.downsample_points(const.g_remote_cloud)
@@ -41,6 +44,7 @@ if __name__ == "__main__":
     #const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
 
     # Voxel
+    print("\nExtract voxels...")
     const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
     const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)
     rmt_strt_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_structure_categories)
@@ -60,12 +64,16 @@ if __name__ == "__main__":
                     max_values=const.DEFAULT_MAX_VALUES,
                     generations=const.param_generations,
                     verbose=False,)
+
+    # Add cleanup code
+    import gc
+    gc.collect()
     
     const.g_best_tr = pareto_front[:3]
     const.g_best_obj1 = pareto_front[3]
     const.g_best_obj1 = pareto_front[4]
     
     # visualize pareto_front[0]
-    visualize_and_record_pareto_front(record=True)
+    visualize_and_record_pareto_front(record=False)
     # temp = [60.0, 2.5, 1.0]
     # visualize_pareto_front(temp)
