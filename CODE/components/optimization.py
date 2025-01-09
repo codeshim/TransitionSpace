@@ -245,7 +245,7 @@ def strength_pareto_evolutionary_algorithm_2(
         archive = combined_population[:archive_size, :]
 
         # Save the best individual's obj1 and obj2
-        ideal_point = np.array([0.0, 0.0])                                  # Define ideal point (normalized space)
+        ideal_point = np.array([-1.0, 0.0])                                 # Define ideal point (normalized space)
         distances = np.linalg.norm(archive[:, 3:5] - ideal_point, axis=1)   # Calculate distances
 
         print("\nDebug: Distances to ideal point:")

@@ -11,6 +11,7 @@ from copy import deepcopy
 
 
 def calculate_shared_space(rmt_polygon, rmt_trans):
+    intersection = None
     try:
         intersection = const.g_local_polygon.intersection(rmt_polygon)
         intersection = utils.clean_polygon(intersection)
@@ -225,7 +226,7 @@ def individual_transitionspace(theta, tx, tz):
     # Ensure obj1 and obj2 fall within bounds
     if const.g_obj1_min <= -obj1 <= const.g_obj1_max and const.g_obj2_min <= obj2 <= const.g_obj2_max:
         # Normalize obj1 (negated for minimization)
-        normalized_obj1 = (-obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)
+        normalized_obj1 = (obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)
 
         # Normalize obj2
         normalized_obj2 = (obj2 - const.g_obj2_min) / (const.g_obj2_max - const.g_obj2_min)

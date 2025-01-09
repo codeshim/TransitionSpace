@@ -41,7 +41,7 @@ if __name__ == "__main__":
     const.g_remote_centroid = utils.get_cloud_centroid(const.g_remote_cloud)
 
     # Polygon
-    #const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
+    const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
 
     # Voxel
     print("\nExtract voxels...")
@@ -65,15 +65,11 @@ if __name__ == "__main__":
                     generations=const.param_generations,
                     verbose=False,)
 
-    # Add cleanup code
-    import gc
-    gc.collect()
-    
     const.g_best_tr = pareto_front[:3]
     const.g_best_obj1 = pareto_front[3]
-    const.g_best_obj1 = pareto_front[4]
+    const.g_best_obj2 = pareto_front[4]
     
     # visualize pareto_front[0]
-    visualize_and_record_pareto_front(record=False)
+    visualize_and_record_pareto_front(record=True)
     # temp = [60.0, 2.5, 1.0]
     # visualize_pareto_front(temp)

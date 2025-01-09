@@ -115,27 +115,31 @@ def visualize_and_record_pareto_front(record=True):
     _, shared_space = calculate_shared_space(transformed_remote_polygon, transformation)
 
     # Check if shared_space is a single Polygon or MultiPolygon
-    if shared_space.geom_type == "Polygon":
-        polygons = [shared_space]  # Treat it as a single-element list for uniform processing
-    elif shared_space.geom_type == "MultiPolygon":
-        polygons = list(shared_space.geoms)  # Extract geometries from MultiPolygon
-    else:
-        polygons = []  # Handle unexpected types (e.g., empty geometry)    
+    if shared_space is not None:
+        # Check if shared_space is a single Polygon or MultiPolygon
+        if shared_space.geom_type == "Polygon":
+            polygons = [shared_space]  # Treat it as a single-element list for uniform processing
+        elif shared_space.geom_type == "MultiPolygon":
+            polygons = list(shared_space.geoms)  # Extract geometries from MultiPolygon
+        else:
+            polygons = []  # Handle unexpected types (e.g., empty geometry)    
 
-    for polygon in polygons:
-        if polygon.is_empty:
-            continue
-        coords = np.array(polygon.exterior.coords)
-        shared_2d_coords.append(coords)
-        # Convert 2D to 3D
-        coords_3d = np.array([[x, 0.05, z] for x, z in coords])
-        shared_mesh = o3d.geometry.LineSet()
-        shared_mesh.points = o3d.utility.Vector3dVector(coords_3d)
-        shared_mesh.lines = o3d.utility.Vector2iVector(
-            [[i, i + 1] for i in range(len(coords_3d) - 1)] + [[len(coords_3d) - 1, 0]]
-        )
-        shared_mesh.paint_uniform_color([1, 0, 1])  # Magenta for shared polygon
-        shared_meshes.append(shared_mesh)
+        for polygon in polygons:
+            if polygon.is_empty:
+                continue
+            coords = np.array(polygon.exterior.coords)
+            shared_2d_coords.append(coords)
+            # Convert 2D to 3D
+            coords_3d = np.array([[x, 0.05, z] for x, z in coords])
+            shared_mesh = o3d.geometry.LineSet()
+            shared_mesh.points = o3d.utility.Vector3dVector(coords_3d)
+            shared_mesh.lines = o3d.utility.Vector2iVector(
+                [[i, i + 1] for i in range(len(coords_3d) - 1)] + [[len(coords_3d) - 1, 0]]
+            )
+            shared_mesh.paint_uniform_color([1, 0, 1])  # Magenta for shared polygon
+            shared_meshes.append(shared_mesh)
+    else:
+        print("Warning: No valid shared space found")
 
     # Visualize with matplotlib (2D projection)
     plt.figure(figsize=(10, 10))

@@ -1,0 +1,32 @@
+Optimization Report
+    ==========================
+    Start Time: 2025-01-09_14-39-37
+
+    Datas:
+    --------------------------
+    Local Space: Area_1_office_1.jsonl
+    Remote Space: Area_5_office_39.jsonl
+
+    Results:
+    --------------------------
+    Transformation: [77.01439045 -2.43341679  0.76569525]
+    Objective 1: -0.398851308232291 
+    Objective 2: 0.11132254995242626
+
+    Parameters:
+    --------------------------
+    Downsample Size: 0.009
+    Grid Size: 0.2
+    Population Size: 50
+    Archive Size: 50
+    Mutation Rate: 0.2
+    Min Values: [-180.0, -6.0, -6.0]
+    Max Values: [180.0, 6.0, 6.0]
+    Generations: 50   
+
+    Timing:
+    --------------------------
+    Total Elapsed Time: 482.31 seconds
+    Average Time per Generation: 9.44 seconds
+
+    Report generated on: 2025-01-09 14:50:13
