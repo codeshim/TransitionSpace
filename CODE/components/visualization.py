@@ -175,7 +175,7 @@ def visualize_and_record_pareto_front(record=True):
             vis_sets.append(line_set)
 
     # Draw filled voxels
-    if vis_strt_keys is not None and len(vis_strt_keys) > 0:
+    if vis_feat_keys is not None and len(vis_feat_keys) > 0:
         for key in vis_feat_keys:
             voxel_center = voxel_centers(key)
             voxel = o3d.geometry.TriangleMesh.create_box(width=const.g_grid_size,

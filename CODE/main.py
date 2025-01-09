@@ -5,6 +5,7 @@ import components.constants as const
 from components.optimization import strength_pareto_evolutionary_algorithm_2
 from components.visualization import visualize_and_record_pareto_front
 import open3d as o3d
+import components.objective_functions as f
 
 
 """
@@ -43,14 +44,23 @@ if __name__ == "__main__":
     # Polygon
     const.g_local_polygon = utils.extract_free_space_polygon(const.g_local_cloud)
 
+    # ============================ Maximize overlapped structure polygons ============================
+    remote_polygon = utils.extract_free_space_polygon(const.g_remote_cloud)
+    const.g_obj1_min = 0.0
+    const.g_obj1_max = min(const.g_local_polygon.area, remote_polygon.area)
+    # ============================ Maximize overlapped structure polygons ============================
+
     # Voxel
     print("\nExtract voxels...")
-    const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
-    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)
-    rmt_strt_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_structure_categories)
-    rmt_feat_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_feature_categories)
-    const.g_obj1_min = 0.0
-    const.g_obj1_max = min(len(const.g_loc_strt_voxels), len(rmt_strt_voxels))
+    # # ============================= Maximize overlapped structure voxels =============================
+    # const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
+    # rmt_strt_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_structure_categories)
+    # const.g_obj1_min = 0.0
+    # const.g_obj1_max = min(len(const.g_loc_strt_voxels), len(rmt_strt_voxels))
+    # # ============================= Maximize overlapped structure voxels =============================
+
+    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)    
+    rmt_feat_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_feature_categories)    
     const.g_obj2_min = 0.0
     const.g_obj2_max = min(len(const.g_loc_feat_voxels), len(rmt_feat_voxels))
     

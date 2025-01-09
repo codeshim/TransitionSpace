@@ -177,36 +177,43 @@ def embed_discontinuities(keys, rmt_voxels):
 def individual_transitionspace(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
     transformed_rmt_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, remote_transformation)
-            
-    # # Compute shared space area using polygon with transformed remote space
-    # transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
-    # area, shared_space = calculate_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
-    # obj1 = -area
-
-    # Extract voxels hashmap of transformed remote space
-    trans_rmt_strt_voxels = utils.extract_selected_voxels_keys(
-        transformed_rmt_cloud, const.g_structure_categories)
-    trans_rmt_feat_voxels = utils.extract_selected_voxels_keys(
-        transformed_rmt_cloud, const.g_feature_categories)
     
-    # maximize overlapped structures
-    if const.g_loc_strt_voxels.ndim == 2 and trans_rmt_strt_voxels.ndim == 2:
-        # View arrays as 1D structured arrays for row-wise comparison
-        loc_voxels = const.g_loc_strt_voxels.view([('', const.g_loc_strt_voxels.dtype)] * const.g_loc_strt_voxels.shape[1])
-        trans_voxels = trans_rmt_strt_voxels.view([('', trans_rmt_strt_voxels.dtype)] * trans_rmt_strt_voxels.shape[1])
+     # ============================ Maximize overlapped structure polygons ============================
+    # Compute shared space area using polygon with transformed remote space
+    transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
+    area, shared_space = calculate_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
+    obj1 = -area
+    # ============================ Maximize overlapped structure polygons ============================
 
-        # Find the intersection of rows
-        overlapping_strt_voxels = np.intersect1d(loc_voxels, trans_voxels)
-
-        # Convert back to 2D array if needed
-        overlapping_strt_voxels = overlapping_strt_voxels.view(const.g_loc_strt_voxels.dtype).reshape(-1, const.g_loc_strt_voxels.shape[1])
-    else:
-        raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
+   
+    # # ============================= Maximize overlapped structure voxels =============================
+    # # Extract voxels hashmap of transformed remote space
+    # trans_rmt_strt_voxels = utils.extract_selected_voxels_keys(
+    #     transformed_rmt_cloud, const.g_structure_categories)
     
-    obj1 = -len(overlapping_strt_voxels)
+    # # maximize overlapped structures
+    # if const.g_loc_strt_voxels.ndim == 2 and trans_rmt_strt_voxels.ndim == 2:
+    #     # View arrays as 1D structured arrays for row-wise comparison
+    #     loc_voxels = const.g_loc_strt_voxels.view([('', const.g_loc_strt_voxels.dtype)] * const.g_loc_strt_voxels.shape[1])
+    #     trans_voxels = trans_rmt_strt_voxels.view([('', trans_rmt_strt_voxels.dtype)] * trans_rmt_strt_voxels.shape[1])
+
+    #     # Find the intersection of rows
+    #     overlapping_strt_voxels = np.intersect1d(loc_voxels, trans_voxels)
+
+    #     # Convert back to 2D array if needed
+    #     overlapping_strt_voxels = overlapping_strt_voxels.view(const.g_loc_strt_voxels.dtype).reshape(-1, const.g_loc_strt_voxels.shape[1])
+    # else:
+    #     raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
+    
+    # obj1 = -len(overlapping_strt_voxels)
+    # # ============================= Maximize overlapped structure voxels =============================
 
     if obj1 == 0:
         return None
+    
+    # Extract voxels hashmap of transformed remote space
+    trans_rmt_feat_voxels = utils.extract_selected_voxels_keys(
+        transformed_rmt_cloud, const.g_feature_categories)
 
     # minimize overlapped features
     if const.g_loc_feat_voxels.ndim == 2 and trans_rmt_feat_voxels.ndim == 2:
@@ -234,10 +241,13 @@ def individual_transitionspace(theta, tx, tz):
         raise ValueError("obj1 or obj2 is out of bounds.")
     
     obj1 = normalized_obj1
-    obj2 = normalized_obj2
+    #obj2 = normalized_obj2
+    obj2 = 0.0
 
     # Save the overlapped voxels
-    const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
+    # # ============================= Maximize overlapped structure voxels =============================
+    #const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
+    # # ============================= Maximize overlapped structure voxels =============================
     const.g_overlap_feat_voxels[remote_transformation] = overlapping_feat_voxels
 
     individual = [theta, tx, tz, obj1, obj2]
