@@ -178,7 +178,7 @@ def individual_transitionspace(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
     transformed_rmt_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, remote_transformation)
     
-     # ============================ Maximize overlapped structure polygons ============================
+    # ============================ Maximize overlapped structure polygons ============================
     # Compute shared space area using polygon with transformed remote space
     transformed_remote_polygon = utils.extract_free_space_polygon(transformed_rmt_cloud)
     area, shared_space = calculate_shared_space(transformed_remote_polygon, remote_transformation)  # Negate for minimization
@@ -241,12 +241,12 @@ def individual_transitionspace(theta, tx, tz):
         raise ValueError("obj1 or obj2 is out of bounds.")
     
     obj1 = normalized_obj1
-    #obj2 = normalized_obj2
-    obj2 = 0.0
+    obj2 = normalized_obj2
+    #obj2 = 0.0
 
     # Save the overlapped voxels
     # # ============================= Maximize overlapped structure voxels =============================
-    #const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
+    # const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
     # # ============================= Maximize overlapped structure voxels =============================
     const.g_overlap_feat_voxels[remote_transformation] = overlapping_feat_voxels
 

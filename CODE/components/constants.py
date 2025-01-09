@@ -46,7 +46,7 @@ g_loc_feat_voxels = None
 g_remote_cloud = []
 g_remote_centroid = None
 g_down_size = 0.05
-g_grid_size = 0.5  # Default grid size for voxelization
+g_grid_size = 0.2  # Default grid size for voxelization
 
 # For polygon
 g_included_category = "ceiling"

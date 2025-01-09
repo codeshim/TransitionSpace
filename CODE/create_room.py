@@ -48,6 +48,35 @@ def create_cuboid_point_cloud(width, height, depth, density):
     return points
 
 def extract_excluded_keys(keys, overlapping_keys):
+    # Step 1: Convert overlapping_keys to a NumPy array for efficient operations
+    overlapping_keys = np.array(overlapping_keys)
+    
+    # Extract the ranges for x, z, and y
+    min_x, max_x = overlapping_keys[:, 0].min(), overlapping_keys[:, 0].max()
+    min_z, max_z = overlapping_keys[:, 2].min(), overlapping_keys[:, 2].max()
+    min_y, max_y = overlapping_keys[:, 1].min(), overlapping_keys[:, 1].max()
+    
+    # Add all (x, z) within the bounds
+    bound_xz = set((x, z) for x in range(min_x, max_x + 1) for z in range(min_z, max_z + 1))
+    
+    # Add all y within the bounds
+    bound_y = set(range(min_y, max_y + 1))
+    
+    # Step 2: Select all y values that exist in keys for (x, z)
+    excluded_keys = set()
+    for x, z in bound_xz:
+        # Filter y values that match (x, z) in keys
+        matching_keys = keys[(keys[:, 0] == x) & (keys[:, 2] == z)]
+        all_ys = matching_keys[:, 1] if matching_keys.size > 0 else []
+        for y in all_ys:  # Only include valid y values
+            if y in bound_y:
+                key = (x, y, z)
+                if key not in overlapping_keys.tolist():  # Compare against overlapping keys
+                    excluded_keys.add(key)
+    
+    return excluded_keys
+
+def extract_excluded_keys_old(keys, overlapping_keys):
     # Step 1: Group by x and find min/max z and y
     bound_xz = set()
     bound_y = set()
@@ -83,6 +112,29 @@ def extract_excluded_keys(keys, overlapping_keys):
     return excluded_keys
 
 def filter_points_by_excluded_keys(points, excluded_keys, grid_size):
+    """
+    Filter points to exclude those that belong to the specified excluded voxel keys.
+
+    :param points: Array of points to filter (NxM, where M >= 3 for X, Y, Z).
+    :param excluded_keys: Array of voxel keys to exclude (Kx3 for X, Y, Z).
+    :param grid_size: Size of the grid for voxelization.
+    :return: Filtered array of points (NxM).
+    """
+    # Compute voxel keys for all points
+    voxel_keys = np.floor(points[:, :3] / grid_size).astype(int)
+
+    # Convert excluded_keys and voxel_keys to structured arrays for comparison
+    dtype = [('x', int), ('y', int), ('z', int)]
+    structured_voxel_keys = np.array([tuple(v) for v in voxel_keys], dtype=dtype)
+    structured_excluded_keys = np.array([tuple(v) for v in excluded_keys], dtype=dtype)
+
+    # Determine which points are not in the excluded keys
+    mask = ~np.isin(structured_voxel_keys, structured_excluded_keys)
+
+    # Return filtered points
+    return points[mask]
+
+def filter_points_by_excluded_keys_old(points, excluded_keys, grid_size):
     """
     Filter points to exclude those that belong to the specified excluded voxel keys.
 
@@ -163,8 +215,8 @@ def enable_double_sided_rendering(mesh):
 
 
 
-density_grid_size = 0.02
-grid_size = 0.15
+density_grid_size = 0.01
+grid_size = 0.2
 
 loc_color = [255 / 255, 113 / 255, 91 / 255]
 rmt_color = [34 / 255, 137 / 255, 221 / 255]
@@ -200,7 +252,7 @@ overlap_color = [124 / 255, 13 / 255, 198 / 255]
 # rmt_depth = 3.0
 # rmt_height = 3.0
 # rmt_density = 10
-15
+
 # rmt_cuboid_points = create_cuboid_point_cloud(rmt_width, rmt_height, rmt_depth, rmt_density)
 
 # rmt_anchor_mat = s3dis.compute_anchor_mat(rmt_cuboid_points)
@@ -283,8 +335,8 @@ loc_all_points = np.vstack([
              np.hstack([points, np.full((points.shape[0], 1), const.CATEGORY_MAPPING[category_name])])
              for category_name, points in loc_s3dis_points])
 
-loc_voxel_keys = utils.extract_voxels_hashmap_points(grid_size, loc_all_points)
-loc_voxel_wireframe = vis.draw_voxel_wireframe(loc_voxel_keys, grid_size, loc_color)
+loc_voxel_keys = utils.extract_selected_voxels_keys(loc_s3dis_points, ["ceiling", "floor", "wall", "beam", "column", "window", "door", "board"])
+#loc_voxel_wireframe = vis.draw_voxel_wireframe(loc_voxel_keys, grid_size, loc_color)
 
 loc_s3dis_pcd = o3d.geometry.PointCloud()
 loc_s3dis_pcd.points = o3d.utility.Vector3dVector(loc_all_points[:, :3])
@@ -298,29 +350,41 @@ rmt_all_points = np.vstack([
              np.hstack([points, np.full((points.shape[0], 1), const.CATEGORY_MAPPING[category_name])])
              for category_name, points in rmt_s3dis_points])
 
-transformation = [0.0, -2.0, 0.0]
+transformation = [-100.95738133, -0.87510507, -1.09824826]
+rmt_centroid = utils.get_cloud_centroid(rmt_s3dis_points)
+rmt_s3dis_points = utils.apply_points_transformation(rmt_s3dis_points, rmt_centroid, transformation)
 rmt_all_points = utils.apply_transformation_points(rmt_all_points, transformation)
 
-rmt_voxel_keys = utils.extract_voxels_hashmap_points(grid_size, rmt_all_points)
-rmt_voxel_wireframe = vis.draw_voxel_wireframe(rmt_voxel_keys, grid_size, rmt_color)
+rmt_voxel_keys = utils.extract_selected_voxels_keys(rmt_s3dis_points, ["ceiling", "wall", "board"])
+#rmt_voxel_wireframe = vis.draw_voxel_wireframe(rmt_voxel_keys, grid_size, rmt_color)
 
 rmt_s3dis_pcd = o3d.geometry.PointCloud()
 rmt_s3dis_pcd.points = o3d.utility.Vector3dVector(rmt_all_points[:, :3])
 rmt_s3dis_pcd.colors = o3d.utility.Vector3dVector(s3dis.set_point_colors(rmt_all_points, "rgb"))
 
+if loc_voxel_keys.ndim == 2 and rmt_voxel_keys.ndim == 2:
+    # View arrays as 1D structured arrays for row-wise comparison
+    loc_voxels = loc_voxel_keys.view([('', loc_voxel_keys.dtype)] * loc_voxel_keys.shape[1])
+    trans_voxels = rmt_voxel_keys.view([('', rmt_voxel_keys.dtype)] * rmt_voxel_keys.shape[1])
+    # Find the intersection of rows
+    overlapping_voxels = np.intersect1d(loc_voxels, trans_voxels)
+    # Convert back to 2D array if needed
+    overlapping_voxels = overlapping_voxels.view(loc_voxel_keys.dtype).reshape(-1, loc_voxel_keys.shape[1])
+else:
+    raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
 
-overlap_voxel_keys = set(loc_voxel_keys.keys()).intersection(set(rmt_voxel_keys.keys()))
-overlap_boxes = vis.draw_voxel_box(overlap_voxel_keys, grid_size, overlap_color)
+#overlap_voxel_keys = set(loc_voxel_keys.keys()).intersection(set(rmt_voxel_keys.keys()))
+overlap_boxes = vis.draw_voxel_box(overlapping_voxels, grid_size, overlap_color)
 
-loc_excluded_keys = extract_excluded_keys(loc_voxel_keys, overlap_voxel_keys)
-#loc_excluded_boxes = vis.draw_voxel_box(loc_excluded_keys, grid_size, loc_color)
-#loc_ex_voxel_wireframe = vis.draw_voxel_wireframe(loc_excluded_keys, grid_size, loc_color)
-rmt_excluded_keys = extract_excluded_keys(rmt_voxel_keys, overlap_voxel_keys)
-#rmt_excluded_boxes = vis.draw_voxel_box(rmt_excluded_keys, grid_size, rmt_color)
-#rmt_ex_voxel_wireframe = vis.draw_voxel_wireframe(rmt_excluded_keys, grid_size, rmt_color)
+loc_excluded_keys = extract_excluded_keys(loc_voxel_keys, overlapping_voxels)
+loc_excluded_boxes = vis.draw_voxel_box(loc_excluded_keys, grid_size, loc_color)
+loc_ex_voxel_wireframe = vis.draw_voxel_wireframe(loc_excluded_keys, grid_size, loc_color)
+rmt_excluded_keys = extract_excluded_keys(rmt_voxel_keys, overlapping_voxels)
+rmt_excluded_boxes = vis.draw_voxel_box(rmt_excluded_keys, grid_size, rmt_color)
+rmt_ex_voxel_wireframe = vis.draw_voxel_wireframe(rmt_excluded_keys, grid_size, rmt_color)
 
 # o3d.visualization.draw_geometries(
-#         [loc_cuboid_pcd, rmt_cuboid_pcd] 
+#         [loc_s3dis_pcd, rmt_s3dis_pcd] 
 #         # + loc_voxel_wireframe + rmt_voxel_wireframe 
 #         + overlap_boxes 
 #         + rmt_ex_voxel_wireframe + loc_ex_voxel_wireframe

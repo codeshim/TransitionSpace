@@ -63,7 +63,6 @@ if __name__ == "__main__":
     rmt_feat_voxels = utils.extract_selected_voxels_keys(const.g_remote_cloud, const.g_feature_categories)    
     const.g_obj2_min = 0.0
     const.g_obj2_max = min(len(const.g_loc_feat_voxels), len(rmt_feat_voxels))
-    
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
     pareto_front = strength_pareto_evolutionary_algorithm_2(
