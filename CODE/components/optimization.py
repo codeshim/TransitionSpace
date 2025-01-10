@@ -291,4 +291,8 @@ def strength_pareto_evolutionary_algorithm_2(
     print(f"\nTotal time for {generations} generations: {const.g_total_elapsed_time:.2f} seconds.")
     print(f"Average time per generation: {const.g_average_generation_time:.2f} seconds.")
 
+    # # ========================================= Single-objective =========================================
+    # best_individual[4] = f.obj2_transitionspace(best_individual[0], best_individual[1], best_individual[2])
+    # # ========================================= Single-objective =========================================
+
     return best_individual

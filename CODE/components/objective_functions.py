@@ -211,6 +211,69 @@ def individual_transitionspace(theta, tx, tz):
     if obj1 == 0:
         return None
     
+    # ======================================== Multi-objectives ========================================
+    # Extract voxels hashmap of transformed remote space
+    trans_rmt_feat_voxels = utils.extract_selected_voxels_keys(
+        transformed_rmt_cloud, const.g_feature_categories)
+
+    # minimize overlapped features
+    if const.g_loc_feat_voxels.ndim == 2 and trans_rmt_feat_voxels.ndim == 2:
+        # View arrays as 1D structured arrays for row-wise comparison
+        loc_voxels = const.g_loc_feat_voxels.view([('', const.g_loc_feat_voxels.dtype)] * const.g_loc_feat_voxels.shape[1])
+        trans_voxels = trans_rmt_feat_voxels.view([('', trans_rmt_feat_voxels.dtype)] * trans_rmt_feat_voxels.shape[1])
+
+        # Find the intersection of rows
+        overlapping_feat_voxels = np.intersect1d(loc_voxels, trans_voxels)
+
+        # Convert back to 2D array if needed
+        overlapping_feat_voxels = overlapping_feat_voxels.view(const.g_loc_feat_voxels.dtype).reshape(-1, const.g_loc_feat_voxels.shape[1])
+    else:
+        raise ValueError("Voxel arrays must be 2D for row-wise comparison.")
+    obj2 = len(overlapping_feat_voxels)
+    # ======================================== Multi-objectives ========================================
+
+    # Ensure obj1 and obj2 fall within bounds
+    # ======================================== Multi-objectives ========================================
+    if const.g_obj1_min <= -obj1 <= const.g_obj1_max and const.g_obj2_min <= obj2 <= const.g_obj2_max:
+        # Normalize obj1 (negated for minimization)
+        normalized_obj1 = (obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)
+
+        # Normalize obj2
+        normalized_obj2 = (obj2 - const.g_obj2_min) / (const.g_obj2_max - const.g_obj2_min)
+    else:
+        raise ValueError("obj1 or obj2 is out of bounds.")
+    # ======================================== Multi-objectives ========================================
+    
+    # # ========================================= Single-objective =========================================
+    # if const.g_obj1_min <= -obj1 <= const.g_obj1_max:
+    #     # Normalize obj1 (negated for minimization)
+    #     normalized_obj1 = (obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)
+    # else:
+    #     raise ValueError("obj1 or obj2 is out of bounds.")
+    # # ========================================= Single-objective =========================================
+    
+    
+    obj1 = normalized_obj1
+    obj2 = normalized_obj2
+    #obj2 = 0.0
+
+    # Save the overlapped voxels
+    # # ============================= Maximize overlapped structure voxels =============================
+    # const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
+    # # ============================= Maximize overlapped structure voxels =============================
+
+    # ======================================== Multi-objectives ========================================
+    const.g_overlap_feat_voxels[remote_transformation] = overlapping_feat_voxels
+    # ======================================== Multi-objectives ========================================
+
+    individual = [theta, tx, tz, obj1, obj2]
+    #print(f"individual: theta({theta}), tx({tx}), tz({tz}), obj1({obj1}), obj2({obj2})")
+    return individual
+
+def obj2_transitionspace(theta, tx, tz):
+    remote_transformation = (theta, tx, tz)
+    transformed_rmt_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, remote_transformation)
+    
     # Extract voxels hashmap of transformed remote space
     trans_rmt_feat_voxels = utils.extract_selected_voxels_keys(
         transformed_rmt_cloud, const.g_feature_categories)
@@ -231,25 +294,13 @@ def individual_transitionspace(theta, tx, tz):
     obj2 = len(overlapping_feat_voxels)
 
     # Ensure obj1 and obj2 fall within bounds
-    if const.g_obj1_min <= -obj1 <= const.g_obj1_max and const.g_obj2_min <= obj2 <= const.g_obj2_max:
-        # Normalize obj1 (negated for minimization)
-        normalized_obj1 = (obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)
-
+    if const.g_obj2_min <= obj2 <= const.g_obj2_max:
         # Normalize obj2
         normalized_obj2 = (obj2 - const.g_obj2_min) / (const.g_obj2_max - const.g_obj2_min)
-    else:
-        raise ValueError("obj1 or obj2 is out of bounds.")
-    
-    obj1 = normalized_obj1
-    obj2 = normalized_obj2
-    #obj2 = 0.0
 
-    # Save the overlapped voxels
-    # # ============================= Maximize overlapped structure voxels =============================
-    # const.g_overlap_strt_voxels[remote_transformation] = overlapping_strt_voxels
-    # # ============================= Maximize overlapped structure voxels =============================
+    obj2 = normalized_obj2
+
     const.g_overlap_feat_voxels[remote_transformation] = overlapping_feat_voxels
 
-    individual = [theta, tx, tz, obj1, obj2]
-    #print(f"individual: theta({theta}), tx({tx}), tz({tz}), obj1({obj1}), obj2({obj2})")
-    return individual
+    return obj2
+
