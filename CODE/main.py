@@ -1,3 +1,4 @@
+# ------------ main.py ------------ 
 import argparse
 from components.S3DIS_to_json import jsonl_to_group_clouds
 import components.geometry_utils as utils

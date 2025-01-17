@@ -1,3 +1,4 @@
+# ------------ geometry_utils.py ------------ 
 import numpy as np
 import open3d as o3d
 from shapely.geometry import Polygon
@@ -5,41 +6,6 @@ from shapely.ops import unary_union
 from shapely.validation import make_valid
 from collections import defaultdict
 import components.constants as const
-
-# def map_group_clouds_to_all_points(group_clouds):
-#     """
-#     group_clouds
-#     {{{"category"}, {X, Y, Z, R, G, B}}, ...}}
-#     ->
-#     all_points
-#     {X, Y, Z, R, G, B, C}
-#     """
-#     all_points = np.vstack([
-#                      np.hstack([points, np.full((points.shape[0], 1), const.CATEGORY_MAPPING[category_name])])
-#                      for category_name, points in group_clouds])
-
-#     return all_points
-
-# def map_all_points_to_group_clouds(all_points):
-#     """   
-#     all_points
-#     {X, Y, Z, R, G, B, C}
-#     ->
-#     group_clouds
-#     {{{"category"}, {X, Y, Z, R, G, B}}, ...}}
-#     """
-#     group_clouds = []
-#     category_ids = np.unique(all_points[:, -1])
-#     id_to_category = {v: k for k, v in const.CATEGORY_MAPPING.items()}
-    
-#     for category_id in category_ids:
-#         category_points = all_points[all_points[:, -1] == category_id]
-#         category_points = category_points[:, :-1]
-#         category_name = id_to_category[category_id]
-#         group_clouds[category_name] = category_points
-
-#     return group_clouds
-
 
 def downsample_points(group_clouds, voxel_size=0.05):
     down_group_clouds = []
@@ -255,43 +221,3 @@ def extract_selected_voxels_keys(group_clouds, selected_group):
         voxel_keys = np.empty((0, 3), dtype=int)    # Return empty array if no keys
 
     return voxel_keys
-    # """
-    # Extract unique voxel keys (x, y, z) occupied by the point cloud,
-    # filtering only points belonging to categories in the selected_group.
-    # Returns a NumPy array of unique voxel keys.
-    # """
-    # voxel_keys = []  # Collect voxel keys as a list
-    # for category, points in group_clouds:
-    #     # Check if the category is in the selected group
-    #     #print(f"category: {category}")
-    #     #print(f"points: {points}, points.shape: {points.shape}")
-    #     """
-    #     category: chair
-    #     points: [[  1.86225      0.587        1.891       96.         102.
-    #       106.        ]
-    #      [  1.86373333   0.59446667   1.86233333 104.         109.
-    #       116.        ]
-    #      [  1.848        0.797        2.187      115.         117.
-    #        96.        ]
-    #      ...
-    #      [  1.84118519   0.21211111   2.01640741  51.          53.
-    #        45.        ]
-    #      [  1.65233333   0.51591667   2.09158333  70.          71.
-    #        66.        ]
-    #      [  1.69814286   0.59910714   2.1155      73.          77.
-    #        84.        ]], points.shape: (618, 6)
-    #     """
-    #     if category in selected_group:
-    #         # Calculate voxel keys for all points in this category
-    #         for point in points:
-    #             keys = (point[:3] // grid_size).astype(int)
-    #             voxel_keys.append(keys)
-
-    # # Combine all keys into a single NumPy array
-    # if voxel_keys:
-    #     voxel_keys = np.vstack(voxel_keys)
-    #     voxel_keys = np.unique(voxel_keys, axis=0)  # Remove duplicates
-    # else:
-    #     voxel_keys = np.empty((0, 3), dtype=int)    # Return empty array if no keys
-
-    # return voxel_keys
