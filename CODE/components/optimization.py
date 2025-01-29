@@ -246,8 +246,14 @@ def strength_pareto_evolutionary_algorithm_2(
         archive = combined_population[:archive_size, :]
 
         # Save the best individual's obj1 and obj2
-        ideal_point = np.array([-1.0, 0.0])                                 # Define ideal point (normalized space)
-        distances = np.linalg.norm(archive[:, 3:5] - ideal_point, axis=1)   # Calculate distances
+        ideal_point = np.array([-1.0, 0.0])
+        # Add weights here (original was equivalent to [1.0, 1.0])
+        
+        # Modify distance calculation to include weights
+        weighted_archive = archive[:, 3:5] * const.g_weights  # Apply weights to objectives
+        weighted_ideal = ideal_point * const.g_weights        # Apply same weights to ideal point     
+        distances = np.linalg.norm(weighted_archive - weighted_ideal, axis=1)   # Calculate weighted distances                            # Define ideal point (normalized space)
+        #distances = np.linalg.norm(archive[:, 3:5] - ideal_point, axis=1)   # Calculate distances
 
         print("\nDebug: Distances to ideal point:")
         for i, dist in enumerate(distances):
@@ -257,7 +263,6 @@ def strength_pareto_evolutionary_algorithm_2(
         best_individual = archive[best_index]                               # Select the best individual
 
         print(f"\nDebug: Best index = {best_index}, Minimum distance = {distances[best_index]}")
-
         print(f"best individual: obj1({best_individual[3]}), obj2({best_individual[4]})")
         const.g_best_obj1_list.append(best_individual[3])
         const.g_best_obj2_list.append(best_individual[4])

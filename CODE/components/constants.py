@@ -1,5 +1,6 @@
 # ------------ constants.py ------------ 
 from collections import defaultdict
+import numpy as np
 
 # Define category code colors
 CATEGORY_MAPPING = {
@@ -39,15 +40,19 @@ g_loc_name = ""
 g_rmt_name = ""
 
 # Default global values for point cloud and optimization operations
+g_local_cloud_origin = []
 g_local_cloud = []
 g_local_polygon = None
-#g_local_voxels = None
+g_local_voxels = None
 g_loc_strt_voxels = None
 g_loc_feat_voxels = None
+g_remote_cloud_origin = []
+g_remote_strt_points = []
+g_remote_feat_points = []
 g_remote_cloud = []
 g_remote_centroid = None
-g_down_size = 0.05
-g_grid_size = 0.2  # Default grid size for voxelization
+g_down_size = 0.12
+g_grid_size = 0.12  # Default grid size for voxelization
 
 # For polygon
 g_included_category = "ceiling"
@@ -56,7 +61,7 @@ g_excluded_categories = [
 ]
 
 # For voxel hashmap
-g_structure_categories = ["ceiling", "floor", "wall", "beam", "column"]
+g_structure_categories = ["floor"]
 g_feature_categories = ["window", "door", "table", "chair", "sofa", "bookcase", "board", "clutter"]
 
 
@@ -93,3 +98,7 @@ g_best_obj2_list = []
 g_total_start_time = 0.0
 g_total_elapsed_time = 0.0
 g_average_generation_time = 0.0
+
+g_ismulitobj = True
+g_isallvoxel = True
+g_weights = np.array([1.0, 2.0])

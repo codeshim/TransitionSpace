@@ -111,6 +111,35 @@ def apply_points_transformation(group_clouds, centroid, transformation):
 
     return transformed_cloud
 
+def apply_transformation_local_points(points, centroid, transformation):
+    theta, tx, tz = transformation
+    centroid_x, centroid_z = centroid
+
+    # Convert theta to radians for computation
+    theta_rad = np.radians(theta)
+
+    # Step 1: Translate to origin (compute centroid of X and Z)
+    translated_points = np.copy(points)
+    translated_points[:, 0] -= centroid_x
+    translated_points[:, 2] -= centroid_z
+
+    # Step 2: Rotate around origin in the X-Z plane
+    rotation_matrix = np.array([
+        [np.cos(theta_rad), -np.sin(theta_rad)],
+        [np.sin(theta_rad),  np.cos(theta_rad)]
+    ])
+    rotated_xz = np.dot(translated_points[:, [0, 2]], rotation_matrix.T)
+
+    rotated_points = np.copy(translated_points)
+    rotated_points[:, 0] = rotated_xz[:, 0]
+    rotated_points[:, 2] = rotated_xz[:, 1]
+
+    # Step 3: Translate back with offset (tx, tz)
+    rotated_points[:, 0] += centroid_x + tx
+    rotated_points[:, 2] += centroid_z + tz
+
+    return rotated_points
+
 def apply_transformation_points(points, transformation):
     """
     Apply a transformation to a point cloud based on rotation and translation.
@@ -204,6 +233,18 @@ def extract_voxels_hashmap_points(grid_size, points):
 
     return hash_map
 
+def extract_voxels_keys_points(points):
+    voxel_keys = (points[:, :3] // const.g_grid_size).astype(int)
+    voxel_keys = np.unique(voxel_keys, axis=0)
+    return voxel_keys
+
+def extract_selected_points(group_clouds, selected_group):
+    selected_points = []
+    for category, points in group_clouds:
+        if category in selected_group:
+            selected_points.append(points)
+    return np.vstack(selected_points) if selected_points else np.empty((0, 6))
+
 def extract_selected_voxels_keys(group_clouds, selected_group):
     voxel_keys = [] 
 
@@ -221,3 +262,43 @@ def extract_selected_voxels_keys(group_clouds, selected_group):
         voxel_keys = np.empty((0, 3), dtype=int)    # Return empty array if no keys
 
     return voxel_keys
+
+def extract_intersected_voxels(voxel_keys_1, voxel_keys_2):
+    if voxel_keys_1.ndim == 2 and voxel_keys_2.ndim == 2:
+        voxel_keys_1_view = voxel_keys_1.view([('', voxel_keys_1.dtype)] * voxel_keys_1.shape[1])
+        voxel_keys_2_view = voxel_keys_2.view([('', voxel_keys_2.dtype)] * voxel_keys_2.shape[1])
+
+        intersected_voxels = np.intersect1d(voxel_keys_1_view, voxel_keys_2_view)
+        intersected_voxels = intersected_voxels.view(voxel_keys_1.dtype).reshape(-1, voxel_keys_1.shape[1])
+        intersected_voxels = np.array(intersected_voxels, dtype=np.int64)
+        
+    else:
+        raise ValueError("Voxel arrays must be 2D(row, column) for row-wise comparison.")
+    
+    return intersected_voxels
+
+def filter_floor_voxels(floor_voxels, feature_voxels, height_percentage):
+    if floor_voxels.size == 0 or feature_voxels.size == 0:
+        return floor_voxels
+
+    # Get feature height range
+    feat_min_y = np.min(feature_voxels[:, 1])
+    feat_max_y = np.max(feature_voxels[:, 1])
+    print(f"Feature heights - min_y: {feat_min_y}, max_y: {feat_max_y}")
+    
+    # Calculate height threshold for features
+    height_threshold = feat_min_y + (feat_max_y - feat_min_y) * height_percentage
+    print(f"height_threshold: {height_threshold}")
+    
+    # Get features below threshold
+    features_below_threshold = feature_voxels[feature_voxels[:, 1] <= height_threshold]
+    
+    # Find overlapping x,z coordinates with filtered features
+    overlap_mask = np.ones(len(floor_voxels), dtype=bool)
+    for i, floor_point in enumerate(floor_voxels[:, [0, 2]]):
+        # Check if this x,z coordinate exists in filtered feature voxels
+        matches = np.all(features_below_threshold[:, [0, 2]] == floor_point, axis=1)
+        if np.any(matches):
+            overlap_mask[i] = False
+
+    return floor_voxels[overlap_mask]

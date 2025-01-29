@@ -327,7 +327,7 @@ overlap_color = [124 / 255, 13 / 255, 198 / 255]
 # ============================================= S3DIS test ==============================================
 
 # Visualize S3DIS point cloud
-loc_file = "Area_1_office_1.jsonl"
+loc_file = "Area_5_office_39.jsonl"
 loc_s3dis_points = s3dis.jsonl_to_group_clouds(loc_file)
 loc_s3dis_points = utils.downsample_points(loc_s3dis_points, density_grid_size)
 
@@ -342,7 +342,7 @@ loc_s3dis_pcd = o3d.geometry.PointCloud()
 loc_s3dis_pcd.points = o3d.utility.Vector3dVector(loc_all_points[:, :3])
 loc_s3dis_pcd.colors = o3d.utility.Vector3dVector(s3dis.set_point_colors(loc_all_points, "rgb"))
 
-rmt_file = "Area_5_office_39.jsonl"
+rmt_file = "Area_4_office_15.jsonl"
 rmt_s3dis_points = s3dis.jsonl_to_group_clouds(rmt_file)
 rmt_s3dis_points = utils.downsample_points(rmt_s3dis_points, density_grid_size)
 
@@ -350,7 +350,7 @@ rmt_all_points = np.vstack([
              np.hstack([points, np.full((points.shape[0], 1), const.CATEGORY_MAPPING[category_name])])
              for category_name, points in rmt_s3dis_points])
 
-transformation = [-100.95738133, -0.87510507, -1.09824826]
+transformation = [24.14727375, 1.1441935, -0.4846767]
 rmt_centroid = utils.get_cloud_centroid(rmt_s3dis_points)
 rmt_s3dis_points = utils.apply_points_transformation(rmt_s3dis_points, rmt_centroid, transformation)
 rmt_all_points = utils.apply_transformation_points(rmt_all_points, transformation)

@@ -94,10 +94,10 @@ def visualize_and_record_pareto_front(record=True):
     transformation = tuple(const.g_best_tr)
 
     # Apply transformation to the remote cloud
-    transformed_remote_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, transformation)
+    transformed_remote_cloud = utils.apply_points_transformation(const.g_remote_cloud_origin, const.g_remote_centroid, transformation)
 
     # Convert point clouds to Open3D format
-    local_all_cloud_points = np.vstack([points for _, points in const.g_local_cloud])
+    local_all_cloud_points = np.vstack([points for _, points in const.g_local_cloud_origin])
     local_cloud_o3d = o3d.geometry.PointCloud()
     local_cloud_o3d.points = o3d.utility.Vector3dVector(local_all_cloud_points[:, :3])
     local_cloud_o3d.colors = o3d.utility.Vector3dVector(local_all_cloud_points[:, 3:6] / 255.0)
@@ -107,83 +107,68 @@ def visualize_and_record_pareto_front(record=True):
     remote_cloud_o3d.points = o3d.utility.Vector3dVector(remote_all_cloud_points[:, :3])
     remote_cloud_o3d.colors = o3d.utility.Vector3dVector(remote_all_cloud_points[:, 3:6] / 255.0)
 
-    # Visualize shared polygon
     shared_meshes = []
-    shared_2d_coords = []  # Store 2D (x, z) coordinates for matplotlib visualization
-
-    transformed_remote_polygon = utils.extract_free_space_polygon(transformed_remote_cloud)
-    _, shared_space = calculate_shared_space(transformed_remote_polygon, transformation)
-
-    # Check if shared_space is a single Polygon or MultiPolygon
-    if shared_space is not None:
-        # Check if shared_space is a single Polygon or MultiPolygon
-        if shared_space.geom_type == "Polygon":
-            polygons = [shared_space]  # Treat it as a single-element list for uniform processing
-        elif shared_space.geom_type == "MultiPolygon":
-            polygons = list(shared_space.geoms)  # Extract geometries from MultiPolygon
-        else:
-            polygons = []  # Handle unexpected types (e.g., empty geometry)    
-
-        for polygon in polygons:
-            if polygon.is_empty:
-                continue
-            coords = np.array(polygon.exterior.coords)
-            shared_2d_coords.append(coords)
-            # Convert 2D to 3D
-            coords_3d = np.array([[x, 0.05, z] for x, z in coords])
-            shared_mesh = o3d.geometry.LineSet()
-            shared_mesh.points = o3d.utility.Vector3dVector(coords_3d)
-            shared_mesh.lines = o3d.utility.Vector2iVector(
-                [[i, i + 1] for i in range(len(coords_3d) - 1)] + [[len(coords_3d) - 1, 0]]
-            )
-            shared_mesh.paint_uniform_color([1, 0, 1])  # Magenta for shared polygon
-            shared_meshes.append(shared_mesh)
-    else:
-        print("Warning: No valid shared space found")
-
-    # Visualize with matplotlib (2D projection)
-    plt.figure(figsize=(10, 10))
-    plt.scatter(local_all_cloud_points[:, 0], local_all_cloud_points[:, 2], c=local_all_cloud_points[:, 3:6] / 255.0, s=1, label="Local Cloud")
-    plt.scatter(remote_all_cloud_points[:, 0], remote_all_cloud_points[:, 2], c=remote_all_cloud_points[:, 3:6] / 255.0, s=1, label="Transformed Remote Cloud")
-
-    for coords in shared_2d_coords:
-        plt.plot(coords[:, 0], coords[:, 1], c='magenta', label="Shared Polygon")
-
-    plt.xlabel("X")
-    plt.ylabel("Z")
-    plt.legend()
-    plt.title("2D Visualization of Clouds and Shared Polygon")
-
-    if record:
-        rec.save_plt_fig("2D")
-    
-    plt.show()
-    
- 
-
-    # Visualize keys
-    vis_strt_keys = const.g_overlap_strt_voxels[transformation]
-    vis_feat_keys = const.g_overlap_feat_voxels[transformation]
     vis_sets = []
 
-    # Draw wireframed voxels
-    if vis_strt_keys is not None and len(vis_strt_keys) > 0:
-        for key in vis_strt_keys:
-            voxel_center = voxel_centers(key)
-            line_set = create_voxel_wireframe(voxel_center)
-            line_set.paint_uniform_color([1.0, 0.0, 0.0])
-            vis_sets.append(line_set)
+    if (not const.g_isallvoxel):
+        # Visualize shared polygon     
+        shared_2d_coords = []  # Store 2D (x, z) coordinates for matplotlib visualization
 
-    # Draw filled voxels
-    if vis_feat_keys is not None and len(vis_feat_keys) > 0:
-        for key in vis_feat_keys:
-            voxel_center = voxel_centers(key)
-            voxel = o3d.geometry.TriangleMesh.create_box(width=const.g_grid_size,
-                                                         height=const.g_grid_size,
-                                                         depth=const.g_grid_size)
-            voxel.translate(voxel_center - (const.g_grid_size / 2.0))  # Center the box
-            voxel.paint_uniform_color([1.0, 0.0, 0.0])  # Red color
-            vis_sets.append(voxel)
+        transformed_remote_polygon = utils.extract_free_space_polygon(transformed_remote_cloud)
+        _, shared_space = calculate_shared_space(transformed_remote_polygon, transformation)
+
+        # Check if shared_space is a single Polygon or MultiPolygon
+        if shared_space is not None:
+            # Check if shared_space is a single Polygon or MultiPolygon
+            if shared_space.geom_type == "Polygon":
+                polygons = [shared_space]  # Treat it as a single-element list for uniform processing
+            elif shared_space.geom_type == "MultiPolygon":
+                polygons = list(shared_space.geoms)  # Extract geometries from MultiPolygon
+            else:
+                polygons = []  # Handle unexpected types (e.g., empty geometry)    
+
+            for polygon in polygons:
+                if polygon.is_empty:
+                    continue
+                coords = np.array(polygon.exterior.coords)
+                shared_2d_coords.append(coords)
+                # Convert 2D to 3D
+                coords_3d = np.array([[x, 0.05, z] for x, z in coords])
+                shared_mesh = o3d.geometry.LineSet()
+                shared_mesh.points = o3d.utility.Vector3dVector(coords_3d)
+                shared_mesh.lines = o3d.utility.Vector2iVector(
+                    [[i, i + 1] for i in range(len(coords_3d) - 1)] + [[len(coords_3d) - 1, 0]]
+                )
+                shared_mesh.paint_uniform_color([1, 0, 1])  # Magenta for shared polygon
+                shared_meshes.append(shared_mesh)
+        else:
+            print("Warning: No valid shared space found")
+
+        # Visualize with matplotlib (2D projection)
+        plt.figure(figsize=(10, 10))
+        plt.scatter(local_all_cloud_points[:, 0], local_all_cloud_points[:, 2], c=local_all_cloud_points[:, 3:6] / 255.0, s=1, label="Local Cloud")
+        plt.scatter(remote_all_cloud_points[:, 0], remote_all_cloud_points[:, 2], c=remote_all_cloud_points[:, 3:6] / 255.0, s=1, label="Transformed Remote Cloud")
+
+        for coords in shared_2d_coords:
+            plt.plot(coords[:, 0], coords[:, 1], c='magenta', label="Shared Polygon")
+
+        plt.xlabel("X")
+        plt.ylabel("Z")
+        plt.legend()
+        plt.title("2D Visualization of Clouds and Shared Polygon")
+
+        if record:
+            rec.save_plt_fig("2D")
+        
+        plt.show()
+    else:
+        vis_strt_keys = const.g_overlap_strt_voxels[transformation]
+        vis_sets = visualize_filled_voxels(vis_strt_keys, color=[0.0, 0.0, 1.0])
+        
+    # Visualize keys
+    if (const.g_ismulitobj):
+        vis_feat_keys = const.g_overlap_feat_voxels[transformation]
+        vis_sets = visualize_filled_voxels(vis_feat_keys)
 
     # Open3D visualization setup
     vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -192,7 +177,9 @@ def visualize_and_record_pareto_front(record=True):
     vis.create_window()
     vis.add_geometry(local_cloud_o3d)
     vis.add_geometry(remote_cloud_o3d)
-    for vis_item in vis_sets + shared_meshes:
+    if (not const.g_isallvoxel):
+        vis.add_geometry(shared_meshes)
+    for vis_item in vis_sets:
         vis.add_geometry(vis_item)
     vis.run()
     vis.destroy_window()
@@ -220,6 +207,30 @@ def visualize_and_record_pareto_front(record=True):
     if record:
         rec.save_report()
 
+def visualize_wireframe_voxels(voxel_keys, color=[1.0, 0.0, 0.0]):
+    vis_sets = []
+    if voxel_keys is not None and len(voxel_keys) > 0:
+        for key in voxel_keys:
+            voxel_center = voxel_centers(key)
+            line_set = create_voxel_wireframe(voxel_center)
+            line_set.paint_uniform_color(color)
+            vis_sets.append(line_set)
+
+    return vis_sets
+
+def visualize_filled_voxels(voxel_keys, color=[1.0, 0.0, 0.0]):
+    vis_sets = []
+    if voxel_keys is not None and len(voxel_keys) > 0:
+        for key in voxel_keys:
+            voxel_center = voxel_centers(key)
+            voxel = o3d.geometry.TriangleMesh.create_box(width=const.g_grid_size,
+                                                         height=const.g_grid_size,
+                                                         depth=const.g_grid_size)
+            voxel.translate(voxel_center - (const.g_grid_size / 2.0))  # Center the box
+            voxel.paint_uniform_color(color)  # Red color
+            vis_sets.append(voxel)
+
+    return vis_sets
 
 # def visualize_pareto_front_old(pereto_set):
 #     """

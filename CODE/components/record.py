@@ -16,7 +16,9 @@ def capture_screenshot(vis):
 
     # Loop until a unique filename is found
     while True:
-        filename = f"{base_filename}_{count}.jpg"
+        if const.g_ismulitobj:
+            filename = f"{base_filename}_{count}_multi.jpg"
+        else: filename = f"{base_filename}_{count}_single.jpg"
         if not os.path.exists(filename):
             break  # Exit the loop if the filename does not exist
         count += 1
@@ -39,6 +41,16 @@ def save_report():
 
     # Format start time for filename and report
     filename = f"{formatted_start_time()}_report.txt"
+    if const.g_ismulitobj:
+        filename = f"{formatted_start_time()}_report_multi.txt"
+        if (not const.g_isallvoxel):
+            filename = f"{formatted_start_time()}_report_multi_polygon.txt"
+        else: filename = f"{formatted_start_time()}_report_multi_voxel.txt"
+    else: 
+        filename = f"{formatted_start_time()}_report_single.txt"
+        if (not const.g_isallvoxel):
+            filename = f"{formatted_start_time()}_report_single_polygon.txt"
+        else: filename = f"{formatted_start_time()}_report_single_voxel.txt"
     filepath = os.path.join(OUT_DIR, filename)
 
     # Create the report content
@@ -60,6 +72,8 @@ def save_report():
 
     Parameters:
     --------------------------
+    Objective 1 Weight: {const.g_weights[0]}
+    Objective 2 Weight: {const.g_weights[1]}
     Downsample Size: {const.g_down_size}
     Grid Size: {const.g_grid_size}
     Population Size: {const.param_population_size}
