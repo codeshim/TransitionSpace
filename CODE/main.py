@@ -11,16 +11,16 @@ import components.objective_functions as f
 
 """
 Example:
-python CODE/main.py --loc Area_3_lounge_1.jsonl --rmt Area_3_office_8.jsonl --grid_size 0.12 --generation 2^C--down_size 0.12 --ismultiobj
+python CODE/main.py --loc Area_3_lounge_1.jsonl --rmt Area_3_office_8.jsonl --ismultiobj --isallvoxel
 """
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--loc", type=str, required=True, help="Path to the local room JSONL file.")
     parser.add_argument("--rmt", type=str, required=True, help="Path to the remote room JSONL file.")
-    parser.add_argument("--grid_size", type=float, default=0.5)
-    parser.add_argument("--generation", type=int, default=50)
-    parser.add_argument("--down_size", type=float, default=0.05)
+    parser.add_argument("--grid_size", type=float, default=const.g_grid_size)
+    parser.add_argument("--generation", type=int, default=const.param_generations)
+    parser.add_argument("--down_size", type=float, default=const.g_down_size)
     parser.add_argument("--ismultiobj", action="store_true")
     parser.add_argument("--isallvoxel", action="store_true")
     
@@ -49,6 +49,11 @@ if __name__ == "__main__":
     const.g_grid_size = args.grid_size
     const.param_generations = args.generation
 
+    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)    
+    remote_feat_voxels = utils.extract_voxels_keys_points(const.g_remote_feat_points)
+    const.g_obj2_min = 0.0
+    const.g_obj2_max = min(len(const.g_loc_feat_voxels), len(remote_feat_voxels))
+
     if (not const.g_isallvoxel):
         # Polygon
         # ============================ Maximize overlapped structure polygons ============================
@@ -61,16 +66,12 @@ if __name__ == "__main__":
         # Voxel
         # ============================= Maximize overlapped structure voxels =============================
         const.g_loc_strt_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_structure_categories)
+        loc_strt_filtered = utils.filter_floor_voxels(const.g_loc_strt_voxels, const.g_loc_feat_voxels)
         remote_strt_voxels = utils.extract_voxels_keys_points(const.g_remote_strt_points)
+        rmt_strt_filtered = utils.filter_floor_voxels(remote_strt_voxels, remote_feat_voxels)
         const.g_obj1_min = 0.0
-        const.g_obj1_max = min(len(const.g_loc_strt_voxels), len(remote_strt_voxels))
+        const.g_obj1_max = min(len(loc_strt_filtered), len(rmt_strt_filtered))
         # ============================= Maximize overlapped structure voxels =============================
-
-
-    const.g_loc_feat_voxels = utils.extract_selected_voxels_keys(const.g_local_cloud, const.g_feature_categories)    
-    remote_feat_voxels = utils.extract_voxels_keys_points(const.g_remote_feat_points)
-    const.g_obj2_min = 0.0
-    const.g_obj2_max = min(len(const.g_loc_feat_voxels), len(remote_feat_voxels))
 
     # strength_pareto_evolutionary_algorithm_2 will be placed here***
     pareto_front = strength_pareto_evolutionary_algorithm_2(

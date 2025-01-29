@@ -53,6 +53,7 @@ g_remote_cloud = []
 g_remote_centroid = None
 g_down_size = 0.12
 g_grid_size = 0.12  # Default grid size for voxelization
+g_height_threshold = 0.6
 
 # For polygon
 g_included_category = "ceiling"

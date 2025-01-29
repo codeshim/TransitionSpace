@@ -277,18 +277,16 @@ def extract_intersected_voxels(voxel_keys_1, voxel_keys_2):
     
     return intersected_voxels
 
-def filter_floor_voxels(floor_voxels, feature_voxels, height_percentage):
+def filter_floor_voxels(floor_voxels, feature_voxels):
     if floor_voxels.size == 0 or feature_voxels.size == 0:
         return floor_voxels
 
     # Get feature height range
     feat_min_y = np.min(feature_voxels[:, 1])
     feat_max_y = np.max(feature_voxels[:, 1])
-    print(f"Feature heights - min_y: {feat_min_y}, max_y: {feat_max_y}")
-    
+
     # Calculate height threshold for features
-    height_threshold = feat_min_y + (feat_max_y - feat_min_y) * height_percentage
-    print(f"height_threshold: {height_threshold}")
+    height_threshold = feat_min_y + (feat_max_y - feat_min_y) * const.g_height_threshold
     
     # Get features below threshold
     features_below_threshold = feature_voxels[feature_voxels[:, 1] <= height_threshold]

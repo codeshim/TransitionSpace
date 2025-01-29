@@ -26,6 +26,16 @@ def calculate_shared_space(rmt_polygon):
 def individual_transitionspace(theta, tx, tz):
     remote_transformation = (theta, tx, tz)
 
+    if (const.g_ismulitobj):
+        # ======================================== Multi-objectives ========================================
+        transformed_rmt_feat_points = utils.apply_transformation_local_points(const.g_remote_feat_points, 
+                                                                              const.g_remote_centroid, 
+                                                                              remote_transformation)
+        transfromed_rmt_feat_voxels = utils.extract_voxels_keys_points(transformed_rmt_feat_points)
+        overlapping_feat_voxels = utils.extract_intersected_voxels(const.g_loc_feat_voxels, transfromed_rmt_feat_voxels)
+        obj2 = len(overlapping_feat_voxels)
+        # ======================================== Multi-objectives ========================================
+
     if (not const.g_isallvoxel):
         # ============================ Maximize overlapped structure polygons ============================
         transformed_rmt_cloud = utils.apply_points_transformation(const.g_remote_cloud, const.g_remote_centroid, remote_transformation)
@@ -38,24 +48,15 @@ def individual_transitionspace(theta, tx, tz):
         # ============================= Maximize overlapped structure voxels =============================
         transformed_rmt_strt_points = utils.apply_transformation_local_points(const.g_remote_strt_points, 
                                                                               const.g_remote_centroid, 
-                                                                              remote_transformation)
-        transfromed_rmt_strt_voxels = utils.extract_voxels_keys_points(transformed_rmt_strt_points)
-        overlapping_strt_voxels = utils.extract_intersected_voxels(const.g_loc_strt_voxels, transfromed_rmt_strt_voxels)
+                                                                              remote_transformation)   
+        remote_strt_voxels = utils.extract_voxels_keys_points(transformed_rmt_strt_points)
+        rmt_strt_filtered = utils.filter_floor_voxels(remote_strt_voxels, transfromed_rmt_feat_voxels)
+        overlapping_strt_voxels = utils.extract_intersected_voxels(const.g_loc_strt_voxels, rmt_strt_filtered)
         obj1 = -len(overlapping_strt_voxels)
         # ============================= Maximize overlapped structure voxels =============================
 
     if obj1 == 0:
         return None
-    
-    if (const.g_ismulitobj):
-        # ======================================== Multi-objectives ========================================
-        transformed_rmt_feat_points = utils.apply_transformation_local_points(const.g_remote_feat_points, 
-                                                                              const.g_remote_centroid, 
-                                                                              remote_transformation)
-        transfromed_rmt_feat_voxels = utils.extract_voxels_keys_points(transformed_rmt_feat_points)
-        overlapping_feat_voxels = utils.extract_intersected_voxels(const.g_loc_feat_voxels, transfromed_rmt_feat_voxels)
-        obj2 = len(overlapping_feat_voxels)
-        # ======================================== Multi-objectives ========================================
     
     # Normalize obj1 (negated for minimization)
     normalized_obj1 = (obj1 - const.g_obj1_min) / (const.g_obj1_max - const.g_obj1_min)

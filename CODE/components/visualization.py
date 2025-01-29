@@ -163,12 +163,12 @@ def visualize_and_record_pareto_front(record=True):
         plt.show()
     else:
         vis_strt_keys = const.g_overlap_strt_voxels[transformation]
-        vis_sets = visualize_filled_voxels(vis_strt_keys, color=[0.0, 0.0, 1.0])
+        vis_sets.extend(visualize_filled_voxels(vis_strt_keys, color=[0.0, 0.0, 1.0]))
         
     # Visualize keys
     if (const.g_ismulitobj):
         vis_feat_keys = const.g_overlap_feat_voxels[transformation]
-        vis_sets = visualize_filled_voxels(vis_feat_keys)
+        vis_sets.extend(visualize_filled_voxels(vis_feat_keys, color=[1.0, 0.0, 0.0]))
 
     # Open3D visualization setup
     vis = o3d.visualization.VisualizerWithKeyCallback()
