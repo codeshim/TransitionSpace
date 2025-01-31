@@ -34,7 +34,7 @@ def normal_to_rotation(normals):
         # Normalize the normal vector
         normal = normal / np.linalg.norm(normal)
         
-        # Find rotation between [0,1,0] and normal (using y-axis instead of z-axis)
+        # Find rotation between [0,1,0] and normal (using y-axis)
         v1 = np.array([0, 1, 0])
         v2 = normal
         
@@ -88,9 +88,9 @@ def quaternion_multiply(q1, q2):
     ])
 
 def generate_diverse_scales(num_points, base_scale_mean=-3.0):
-    """Generate diverse scales for Gaussian splats with more subtle variations.
+    """Generate diverse scales for Gaussian splats with subtle variations.
     The splats will be flat disks perpendicular to the normal."""
-    # Generate random base scales with less variation
+    # Generate random base scales
     base_scales = np.random.normal(base_scale_mean, 0.2, (num_points, 3)).astype(np.float32)
     
     # Add subtle variety to the scales while maintaining disk shape
@@ -239,6 +239,17 @@ def convert_jsonl_to_splats(jsonl_path, output_path, voxel_size):
     
     # Convert to gaussian format
     xyz, rotations, scales, opacities, features_dc, features_extra = points_to_gaussian_data(downsampled_points)
+    
+    # Save as PLY
+    save_as_ply(output_path, xyz, rotations, scales, opacities, features_dc, features_extra)
+    print(f"Saved converted data to {output_path}")
+
+def convert_points_to_splats(points, output_path, random_seed=42):
+    # Convert to gaussian format
+    xyz, rotations, scales, opacities, features_dc, features_extra = points_to_gaussian_data(points, random_seed)
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # Save as PLY
     save_as_ply(output_path, xyz, rotations, scales, opacities, features_dc, features_extra)

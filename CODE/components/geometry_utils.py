@@ -233,8 +233,8 @@ def extract_voxels_hashmap_points(grid_size, points):
 
     return hash_map
 
-def extract_voxels_keys_points(points):
-    voxel_keys = (points[:, :3] // const.g_grid_size).astype(int)
+def extract_voxels_keys_points(points, grid_size=const.g_grid_size):
+    voxel_keys = (points[:, :3] // grid_size).astype(int)
     voxel_keys = np.unique(voxel_keys, axis=0)
     return voxel_keys
 
